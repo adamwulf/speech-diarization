@@ -8,7 +8,7 @@ contract, the model choices, and the runtime facts that were verified.
 
 | File | Purpose |
 |---|---|
-| `src/inference-worker.js` | Loads the models, handles `transcribe` and `diarize` messages, one task at a time. |
+| `src/inference-worker.js` | Loads the models, handles `transcribe`, `diarize`, and `preload` messages, one request at a time. |
 | `src/asr-models.js` | The Whisper models that the user can select (repository, revision, download bytes). The page uses it too. |
 | `src/inference-tasks.js` | Task flow with injected model calls, silence check, progress helpers, the one-model slot for Whisper. |
 | `src/alignment.js` | Word timestamp cleanup, speaker assignment, cue grouping. |
@@ -42,7 +42,19 @@ Create the worker with
   `asr` has no `progress` (indeterminate).
 - Model loads are kept for the life of the worker. A failed load is tried again on the
   next request. The worker keeps one Whisper model: when a request selects a different
-  one, the worker disposes the old model, then loads the new one.
+  one, the worker disposes the old model, then loads the new one. Dispose frees memory
+  only; the model files stay in the `transformers-cache` Cache API store, and nothing
+  in the app deletes from it.
+- `preload` requests load a model with no audio. The page sends one for the selected
+  Whisper model and one for diarization at startup, and one for each new Whisper
+  selection (at most one Whisper preload at a time; when it ends, the page preloads the
+  model that is selected then, if it is different). Preloads go through the same queue
+  as tasks, so the Whisper slot never changes models during a task. A task waits for
+  the preload that is running, but goes before preloads that have not started, so a
+  transcription without speakers does not wait for the diarization download.
+- Each load also sends `{type: 'model', ...}` messages (no `id`) for the model lines on
+  the page: `loading` with `progress`, `loading` without `progress` while the
+  diarization sessions are created, then `ready` or `failed`.
 
 ## Models
 

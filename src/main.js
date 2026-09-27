@@ -28,7 +28,10 @@ const clearBtn = $('clearBtn');
 const speakersToggle = $('speakersToggle');
 const asrModelSelect = $('asrModelSelect');
 const asrModel = $('asrModel');
+const asrModelInfo = $('asrModelInfo');
+const asrModelState = $('asrModelState');
 const diarModel = $('diarModel');
+const diarModelState = $('diarModelState');
 const track = $('track');
 const fill = $('fill');
 const statusEl = $('status');
@@ -71,32 +74,54 @@ const state = {
   speakerNames: new Map(),
   // Pending retry: { label, kind: 'transcribe'|'diarize', run }
   retry: null,
+  // What each model line shows: { state: 'queued'|'loading'|'ready'|'failed', progress?: 0..1 }.
+  // Whisper entries are per model key, so each selection shows its own state.
+  models: { asr: new Map(), diarization: null },
 };
 
 let mic = null;
+// A transcribe or diarize request is waiting in the worker queue.
+let taskRunning = false;
+// The Whisper model that a preload request is loading, or null.
+let asrPreloadKey = null;
 let recordingTimer = 0;
 let recordingStartedAt = 0;
 
 // ---- Inference worker client ----
-// Created lazily, so nothing is downloaded until the first transcription.
-// A crashed or unloadable worker is discarded and recreated on the next run.
+// Created on the first request (the model preloads at page startup). The worker
+// runs requests one at a time. A crashed or unloadable worker is discarded
+// and recreated on the next request.
 class InferenceClient {
   #worker = null;
   #nextId = 1;
-  #pending = null;
+  #pending = new Map(); // id -> {resolve, reject, onProgress}
+  #onModelState;
+  #onCrash;
+
+  /**
+   * `onModelState(message)` gets the worker's `{type: 'model'}` messages.
+   * `onCrash()` runs after a crash rejects the pending requests.
+   */
+  constructor({ onModelState, onCrash }) {
+    this.#onModelState = onModelState;
+    this.#onCrash = onCrash;
+  }
 
   run(request, onProgress) {
-    if (this.#pending) return Promise.reject(new Error('Another task is still running.'));
     const id = this.#nextId++;
     return new Promise((resolve, reject) => {
-      this.#pending = { id, resolve, reject, onProgress };
+      this.#pending.set(id, { resolve, reject, onProgress });
       try {
         const worker = this.#ensureWorker();
-        // Transfer a copy; the page keeps its own PCM for later re-diarization.
-        const audio = request.audio.slice();
-        worker.postMessage({ ...request, id, audio }, [audio.buffer]);
+        if (request.audio) {
+          // Transfer a copy; the page keeps its own PCM for later re-diarization.
+          const audio = request.audio.slice();
+          worker.postMessage({ ...request, id, audio }, [audio.buffer]);
+        } else {
+          worker.postMessage({ ...request, id });
+        }
       } catch (error) {
-        this.#pending = null;
+        this.#pending.delete(id);
         reject(error);
       }
     });
@@ -119,15 +144,19 @@ class InferenceClient {
   }
 
   #handleMessage(message) {
-    const pending = this.#pending;
-    if (!pending || !message || message.id !== pending.id) return;
+    if (message?.type === 'model') {
+      this.#onModelState(message);
+      return;
+    }
+    const pending = this.#pending.get(message?.id);
+    if (!pending) return;
     if (message.type === 'progress') {
       pending.onProgress?.(message);
     } else if (message.type === 'result') {
-      this.#pending = null;
+      this.#pending.delete(message.id);
       pending.resolve(message);
     } else if (message.type === 'error') {
-      this.#pending = null;
+      this.#pending.delete(message.id);
       pending.reject(new Error(message.message || 'the speech engine reported an unknown error'));
     }
   }
@@ -136,13 +165,14 @@ class InferenceClient {
     if (worker !== this.#worker) return;
     worker.terminate();
     this.#worker = null;
-    const pending = this.#pending;
-    this.#pending = null;
-    pending?.reject(new Error(detail));
+    const pending = [...this.#pending.values()];
+    this.#pending.clear();
+    for (const request of pending) request.reject(new Error(detail));
+    this.#onCrash();
   }
 }
 
-const inference = new InferenceClient();
+const inference = new InferenceClient({ onModelState: handleModelState, onCrash: handleCrash });
 const meter = new LevelMeter($('meter'));
 
 // ---- Small helpers ----
@@ -161,6 +191,11 @@ function sentences(...parts) {
 
 function plural(count, noun) {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+/** A 0..1 fraction as a whole percentage, clamped to 0..100. */
+function percent(fraction) {
+  return Math.round(Math.min(1, Math.max(0, fraction)) * 100);
 }
 
 /** Speaker detection is on and has run on the current transcript. */
@@ -238,16 +273,34 @@ function setProgress(value) {
     fill.style.width = '';
     track.removeAttribute('aria-valuenow');
   } else {
-    const percent = Math.round(Math.min(1, Math.max(0, value)) * 100);
+    const filled = percent(value);
     track.classList.remove('indeterminate');
-    fill.style.width = `${percent}%`;
-    track.setAttribute('aria-valuenow', String(percent));
+    fill.style.width = `${filled}%`;
+    track.setAttribute('aria-valuenow', String(filled));
   }
 }
 
-function renderAsrModel() {
+function modelStateText(entry) {
+  switch (entry?.state) {
+    case 'queued': return 'waiting to download';
+    case 'loading': return Number.isFinite(entry.progress) ? `downloading ${percent(entry.progress)}%` : 'preparing';
+    case 'ready': return 'ready';
+    case 'failed': return 'could not load, tries again when needed';
+    default: return '';
+  }
+}
+
+function renderModelState(element, entry) {
+  const text = modelStateText(entry);
+  element.textContent = text ? ` · ${text}` : '';
+  element.dataset.state = entry?.state ?? '';
+}
+
+function renderModelLines() {
   const model = getAsrModel(asrModelSelect.value);
-  asrModel.textContent = `${model.label} · speech-to-text · ${downloadSize(model.bytes)} · runs locally`;
+  asrModelInfo.textContent = `${model.label} · speech-to-text · ${downloadSize(model.bytes)} · runs locally`;
+  renderModelState(asrModelState, state.models.asr.get(asrModelSelect.value));
+  renderModelState(diarModelState, state.models.diarization);
 }
 
 function setActiveModel(stage) {
@@ -262,7 +315,23 @@ function handleProgress(message) {
   const text = (typeof message.message === 'string' && message.message.trim())
     || STAGE_TEXT[message.stage]
     || 'Working…';
-  setStatus(text, { value: determinate ? `${Math.round(Math.min(1, Math.max(0, message.progress)) * 100)}%` : '' });
+  setStatus(text, { value: determinate ? `${percent(message.progress)}%` : '' });
+}
+
+/** Model-line updates from the worker, whichever request started the load. */
+function handleModelState(message) {
+  const entry = { state: message.state, progress: message.progress };
+  if (message.model === 'asr') state.models.asr.set(message.asrModel, entry);
+  else if (message.model === 'diarization') state.models.diarization = entry;
+  renderModelLines();
+}
+
+/** A worker crash stops every load in progress; the next request tries again. */
+function handleCrash() {
+  const stopped = (entry) => (entry?.state === 'queued' || entry?.state === 'loading' ? { state: 'failed' } : entry);
+  for (const [key, entry] of state.models.asr) state.models.asr.set(key, stopped(entry));
+  state.models.diarization = stopped(state.models.diarization);
+  renderModelLines();
 }
 
 function setRetry(retry) {
@@ -442,7 +511,52 @@ function failureText(prefix, error) {
   return message.toLowerCase().startsWith(prefix.toLowerCase()) ? message : `${prefix}: ${message}`;
 }
 
+// ---- Model preloads ----
+// Both models start to load when the page opens, and the selected Whisper
+// model loads when the selection changes. Loading a different Whisper model
+// frees the previous one from memory, but its files stay in the browser
+// cache, so selecting it again does not download it again.
+
+/** A task that waits behind a preload shows the preload's progress. */
+function showPreloadProgress(message) {
+  if (taskRunning) handleProgress(message);
+}
+
+function preloadAsr() {
+  const key = asrModelSelect.value;
+  if (asrPreloadKey === key) return;
+  state.models.asr.set(key, { state: 'queued' });
+  renderModelLines();
+  // One Whisper preload at a time. When it ends, the model selected then
+  // loads, so moving through the list does not download every model.
+  if (asrPreloadKey) return;
+  asrPreloadKey = key;
+  inference.run({ type: 'preload', model: 'asr', asrModel: key }, showPreloadProgress)
+    .catch(() => {}) // The model line shows the failure; the next transcription tries again.
+    .finally(() => {
+      asrPreloadKey = null;
+      if (asrModelSelect.value !== key) preloadAsr();
+    });
+}
+
+function preloadDiarization() {
+  state.models.diarization = { state: 'queued' };
+  renderModelLines();
+  inference.run({ type: 'preload', model: 'diarization' }, showPreloadProgress)
+    .catch(() => {}); // The model line shows the failure; the next speaker detection tries again.
+}
+
 // ---- Transcription and diarization ----
+/** Runs a transcribe or diarize request, which waits for a preload that has started. */
+async function runTask(request) {
+  taskRunning = true;
+  try {
+    return await inference.run(request, handleProgress);
+  } finally {
+    taskRunning = false;
+  }
+}
+
 async function processSource({ blob, kind, name }) {
   state.phase = 'busy';
   setRetry(null);
@@ -473,10 +587,7 @@ async function transcribe(candidate) {
 
   let result;
   try {
-    result = await inference.run(
-      { type: 'transcribe', audio: candidate.audio, speakers, asrModel: asrModelKey },
-      handleProgress,
-    );
+    result = await runTask({ type: 'transcribe', audio: candidate.audio, speakers, asrModel: asrModelKey });
   } catch (error) {
     setRetry({ label: 'Retry transcription', kind: 'transcribe', run: () => transcribe(candidate) });
     finishTask();
@@ -536,10 +647,7 @@ async function diarize() {
 
   let result;
   try {
-    result = await inference.run(
-      { type: 'diarize', audio: source.audio, segments: state.workerSegments },
-      handleProgress,
-    );
+    result = await runTask({ type: 'diarize', audio: source.audio, segments: state.workerSegments });
   } catch (error) {
     fail(error);
     return;
@@ -710,7 +818,10 @@ speakersToggle.addEventListener('change', () => {
   }
 });
 
-asrModelSelect.addEventListener('change', renderAsrModel);
+asrModelSelect.addEventListener('change', () => {
+  renderModelLines();
+  preloadAsr();
+});
 
 exportMdBtn.addEventListener('click', () => download('markdown'));
 exportVttBtn.addEventListener('click', () => download('webvtt'));
@@ -732,7 +843,7 @@ for (const [key, model] of Object.entries(ASR_MODELS)) {
   asrModelSelect.add(new Option(`${model.level} — ${key} (${downloadSize(model.bytes)})`, key));
 }
 asrModelSelect.value = DEFAULT_ASR_MODEL;
-renderAsrModel();
+renderModelLines();
 
 if (typeof Worker === 'undefined' || typeof OfflineAudioContext === 'undefined') {
   render();
@@ -743,4 +854,6 @@ if (typeof Worker === 'undefined' || typeof OfflineAudioContext === 'undefined')
   setStatus('This browser is missing Web Workers or Web Audio, which this demo needs. Use a current version of Chrome, Edge, Firefox, or Safari.', { tone: 'error' });
 } else {
   render();
+  preloadAsr();
+  preloadDiarization();
 }
