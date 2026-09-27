@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="Speech-to-text with speaker labels, running entirely in your browser." />
+  <title>Speech Recognition &amp; Diarization</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>Speech Recognition &amp; Diarization</h1>
+    <p class="subtitle">
+      Speech-to-text with speaker labels, running entirely in your browser —
+      local Whisper and speaker-diarization models (one-time download, only when first needed).
+      Your audio never leaves this device.
+    </p>
+
+    <main class="layout">
+      <!-- LEFT: sources, options, model progress -->
+      <section class="panel recog-panel" aria-labelledby="recogHeading">
+        <h2 class="section-label" id="recogHeading">Speech recognition</h2>
+        <div class="buttons">
+          <button type="button" class="primary" id="micBtn">Start recording</button>
+          <button type="button" id="fileBtn">Transcribe file…</button>
+          <button type="button" id="clearBtn" disabled>Clear</button>
+          <!-- Hidden picker; fileBtn opens it. Any format the browser can decode (m4a, mp3, wav…). -->
+          <input type="file" id="fileInput" accept="audio/*" hidden />
+        </div>
+        <p class="helper">
+          Record, then click “Stop recording” to transcribe — or pick an audio file.
+          Each new recording or file replaces the current audio, transcript, and speaker names.
+        </p>
+
+        <!-- Native canvas mic level meter -->
+        <div class="meter">
+          <canvas id="meter" role="img" aria-label="Microphone input level"></canvas>
+        </div>
+
+        <div class="check">
+          <input type="checkbox" id="speakersToggle" checked aria-describedby="speakersHelp" />
+          <label for="speakersToggle">Detect speakers</label>
+        </div>
+        <p class="helper" id="speakersHelp">
+          Labels who spoke when. When off, new audio skips speaker detection and speaker
+          names are hidden in the transcript and exports. Turning it back on detects
+          speakers in the current audio if needed.
+        </p>
+
+        <h3 class="section-label mt">Models</h3>
+        <div class="model-line" id="asrModel">Whisper tiny.en · speech-to-text · ~41 MB · runs locally</div>
+        <div class="model-line" id="diarModel">pyannote + WeSpeaker · speaker diarization · ~34 MB · runs locally</div>
+        <div class="track" id="track" role="progressbar" aria-label="Task progress" aria-valuemin="0" aria-valuemax="100" hidden>
+          <div class="fill" id="fill"></div>
+        </div>
+
+        <div class="status" id="status" role="status" aria-live="polite">
+          Ready. Click “Start recording”, or transcribe an audio file. Models download the first time they are needed.
+        </div>
+        <div class="buttons" id="retryRow" hidden>
+          <button type="button" class="primary" id="retryBtn">Retry</button>
+        </div>
+      </section>
+
+      <!-- RIGHT: current audio, speakers, transcript, exports -->
+      <section class="panel transcript-panel" id="transcriptPanel" aria-labelledby="transcriptHeading" aria-busy="false">
+        <h2 class="section-label" id="transcriptHeading">Transcript</h2>
+
+        <div class="source" id="sourceBlock" hidden>
+          <p class="source-info" id="sourceInfo"></p>
+          <audio id="player" controls preload="metadata" aria-label="Current audio"></audio>
+        </div>
+
+        <div class="speakers" id="speakersSection" hidden>
+          <h3 class="section-label mt">Speakers</h3>
+          <p class="helper flush">
+            Rename a speaker to update every matching turn and both exports.
+            Leave a name blank to use the default.
+          </p>
+          <div class="speaker-list" id="speakerList"></div>
+        </div>
+
+        <p class="empty" id="transcriptEmpty">
+          No transcript yet. Record or choose an audio file to get started.
+        </p>
+        <ol class="turns" id="transcriptList" aria-label="Transcript turns" hidden></ol>
+
+        <div class="buttons">
+          <button type="button" id="exportMdBtn" disabled>Export Markdown</button>
+          <button type="button" id="exportVttBtn" disabled>Export WebVTT</button>
+        </div>
+      </section>
+    </main>
+
+    <p class="footnote repo-link">
+      Speech-to-text with <a href="https://huggingface.co/onnx-community/whisper-tiny.en_timestamped" target="_blank" rel="noopener">Whisper tiny.en</a>
+      via <a href="https://github.com/huggingface/transformers.js" target="_blank" rel="noopener">Transformers.js</a>.
+      Speaker diarization with <a href="https://github.com/briox/diarization-js" target="_blank" rel="noopener">diarization-js</a>,
+      a port of <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noopener">pyannote speaker-diarization-community-1</a>
+      by the <a href="https://github.com/pyannote/pyannote-audio" target="_blank" rel="noopener">pyannote.audio</a> team:
+      pyannote segmentation-3.0 (MIT), <a href="https://github.com/wenet-e2e/wespeaker" target="_blank" rel="noopener">WeSpeaker</a>
+      ResNet34 speaker embeddings (<a href="https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM" target="_blank" rel="noopener">pyannote/wespeaker-voxceleb-resnet34-LM</a>),
+      and community-1 PLDA parameters; the embedding and PLDA models are licensed
+      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>
+      (<a href="https://huggingface.co/briox/diarization-js-community-1" target="_blank" rel="noopener">ONNX artifacts</a>).
+      Models run locally with ONNX Runtime Web; only model files are downloaded, never your audio.
+    </p>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

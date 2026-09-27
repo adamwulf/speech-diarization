@@ -1,0 +1,243 @@
+/* Tokens, typography, panels, buttons, meter, and progress track follow the
+   speech-ai-demo recognition page; additions are marked. */
+:root {
+  --bg: #0f1115;
+  --panel: #1a1e27;
+  --panel-2: #232936;
+  --text: #f2f5fa;
+  --muted: #9aa5b8;
+  --accent: #4da3ff;
+  --chosen: #ffd166;
+  --nontop: #e06cff;
+  --bar-bg: #2b3242;
+  --border: #2e3646;
+  --danger: #ff6b6b;
+  /* Added: extra speaker colors after accent / chosen / nontop. */
+  --speaker-4: #5fd3a8;
+  --speaker-5: #ff9f5a;
+  --speaker-6: #b7c4ff;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 20px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1400px; margin: 0 auto; padding: 32px 28px 70px; }
+
+h1 { font-size: 40px; margin: 0 0 4px; letter-spacing: -0.5px; }
+.subtitle { color: var(--muted); font-size: 20px; margin: 0 0 26px; }
+
+/* Two equal columns (recognition | transcript); stacks under 900px. */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 26px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 22px;
+}
+
+/* Eyebrow / section labels (also used on headings, so reset heading weight). */
+label, .section-label {
+  display: block;
+  font-size: 15px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.section-label { margin-top: 0; line-height: 1.4; }
+.section-label.mt { margin-top: 18px; }
+
+/* Buttons */
+.buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+button {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 14px 22px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+}
+button:hover:not(:disabled) { background: #2c3444; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #06121f; }
+button.primary:hover:not(:disabled) { background: #6bb4ff; }
+/* Live mic state: danger red so "we're recording" is unmistakable. */
+button.recording { background: var(--danger); border-color: var(--danger); color: #180606; }
+button.recording:hover:not(:disabled) { background: #ff8585; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Added: visible keyboard focus. */
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary:focus-visible, button.recording:focus-visible { outline-color: var(--text); }
+
+/* A small pulsing dot in the status line while recording. */
+.rec-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--danger); display: inline-block; margin-right: 8px;
+  vertical-align: middle; animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* Added: text inputs share the reference select styling. */
+input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 18px;
+  font-family: inherit;
+}
+input[type="text"]::placeholder { color: var(--muted); opacity: 1; }
+input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Added: speaker-detection checkbox row. */
+.check { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+.check input {
+  width: 22px; height: 22px; margin: 0; flex: none;
+  accent-color: var(--accent); cursor: pointer;
+}
+.check input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check input:disabled { opacity: 0.45; cursor: not-allowed; }
+.check label {
+  display: inline; margin: 0;
+  font-size: 20px; font-weight: 600; text-transform: none; letter-spacing: 0;
+  color: var(--text); cursor: pointer;
+}
+.check input:disabled + label { opacity: 0.45; cursor: not-allowed; }
+
+/* Added: explanatory helper text. */
+.helper { color: var(--muted); font-size: 16px; line-height: 1.5; margin: 12px 0 0; }
+.helper.flush { margin: 0 0 12px; }
+
+/* Model info block (monospace readout). */
+.model-line {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 15px; color: var(--muted);
+  background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.model-line + .model-line { margin-top: 8px; }
+/* Added: highlight the model in use; dim diarization while it is switched off. */
+.model-line.active { border-color: var(--accent); color: var(--text); }
+.model-line.off { opacity: 0.5; }
+
+/* Progress bar (family track/fill). */
+.track {
+  position: relative;
+  background: var(--bar-bg); border-radius: 8px; height: 34px;
+  overflow: hidden; margin-top: 10px;
+}
+.fill {
+  height: 100%; width: 0; border-radius: 8px 0 0 8px;
+  background: linear-gradient(90deg, #3a72c9, var(--accent));
+  transition: width 0.35s ease; min-width: 2px;
+}
+/* Added: indeterminate state for steps that report no percentage. */
+.track.indeterminate .fill {
+  width: 35%; border-radius: 8px; transition: none;
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+@keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+
+/* Status line */
+.status { min-height: 24px; color: var(--muted); font-size: 17px; margin-top: 16px; overflow-wrap: anywhere; }
+.status.error { color: var(--danger); }
+.status.warning { color: var(--chosen); }
+.meta-value { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--chosen); }
+
+/* Mic level meter (native canvas). */
+canvas { display: block; max-width: 100%; }
+.meter {
+  margin-top: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--bar-bg);
+}
+.meter canvas { width: 100%; height: 64px; }
+
+/* Added: transcript panel. */
+.source-info { margin: 0 0 10px; color: var(--muted); font-size: 17px; overflow-wrap: anywhere; }
+.source-info strong { color: var(--text); font-weight: 600; }
+audio { display: block; width: 100%; }
+
+.speaker-list { display: flex; flex-direction: column; gap: 10px; }
+.speaker-row { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); gap: 12px; align-items: center; }
+.speaker-row label { margin: 0; display: flex; align-items: center; gap: 10px; }
+.swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--spk, var(--muted)); }
+
+[data-color="0"] { --spk: var(--accent); }
+[data-color="1"] { --spk: var(--chosen); }
+[data-color="2"] { --spk: var(--nontop); }
+[data-color="3"] { --spk: var(--speaker-4); }
+[data-color="4"] { --spk: var(--speaker-5); }
+[data-color="5"] { --spk: var(--speaker-6); }
+
+.empty {
+  margin: 18px 0 0; padding: 18px;
+  color: var(--muted); font-size: 17px;
+  background: var(--panel-2); border: 1px dashed var(--border); border-radius: 10px;
+}
+.turns { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.turn {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--spk, var(--border));
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.turn-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 15px; }
+.turn-speaker { font-weight: 700; color: var(--spk, var(--text)); overflow-wrap: anywhere; }
+.turn-speaker.unknown { color: var(--muted); font-style: italic; font-weight: 600; }
+.turn-time {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.turn-text { margin: 4px 0 0; overflow-wrap: anywhere; }
+
+/* Footer */
+.footnote { margin-top: 30px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+.footnote a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.footnote a:hover { color: var(--accent); }
+.repo-link { margin-top: 14px; }
+
+/* Added: phone layout. */
+@media (max-width: 600px) {
+  body { font-size: 18px; }
+  .wrap { padding: 20px 16px 48px; }
+  h1 { font-size: 30px; }
+  .subtitle { font-size: 17px; margin-bottom: 20px; }
+  .panel { padding: 16px; }
+  .buttons { gap: 10px; }
+  .buttons button { flex: 1 1 auto; }
+  button { font-size: 18px; padding: 12px 16px; }
+  .check label { font-size: 18px; }
+  .speaker-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rec-dot { animation: none; }
+  .fill { transition: none; }
+  .track.indeterminate .fill { animation: none; width: 100%; opacity: 0.5; }
+}
