@@ -19,12 +19,16 @@ Use vanilla JavaScript modules with Vite. Main thread owns microphone/file decod
 
 - `{type: 'transcribe', id, audio: Float32Array, speakers: boolean, asrModel?: 'tiny.en'|'base.en'|'small.en'}` (default `tiny.en`)
 - `{type: 'diarize', id, audio: Float32Array, segments: TranscriptSegment[]}` for an existing transcript
+- `{type: 'preload', id, model: 'asr'|'diarization', asrModel?: 'tiny.en'|'base.en'|'small.en'}` loads one model before it is needed (`asrModel` default `tiny.en`)
 
 Outgoing:
 
 - `{type: 'progress', id, stage: 'asr-load'|'asr'|'diarization-load'|'diarization', message, progress?: number}` where progress is 0..1, omitted when indeterminate.
-- `{type: 'result', id, segments: TranscriptSegment[], diarized: boolean, warning?: string}`
+- `{type: 'result', id, segments: TranscriptSegment[], diarized: boolean, warning?: string}`; a `preload` result has no other fields.
 - `{type: 'error', id, message}`
+- `{type: 'model', model: 'asr'|'diarization', asrModel?, state: 'loading'|'ready'|'failed', progress?: number}` with no `id`: a model load changed state, whichever request started it. `asrModel` is set for `asr`.
+
+The worker runs requests one at a time, preloads included. A task waits for the request that is running (even a preload of a model it does not use), but goes before preloads that have not started. A `preload` replaces a waiting `preload` of the same model; the replaced one gets a `result` at once.
 
 `TranscriptSegment`: `{start: number, end: number, text: string, speaker: string|null, words: Array<{start: number, end: number, text: string}>}`. Times are seconds, finite, nonnegative, end > start. Speaker IDs are stable strings within one source audio. Text contains words joined naturally. Word timings are retained in each grouped cue so enabling speaker detection later can split it at speaker boundaries without transcribing again. The UI preserves the original worker segments for `diarize` requests and uses normalized copies for display/export. No speaker names stored in worker; names belong to UI map.
 

@@ -115,6 +115,25 @@ export function createModelSlot({ load, dispose }) {
   };
 }
 
+/**
+ * Add a worker request to `waiting` (the requests that have not started), in place.
+ * A task goes after the other waiting tasks but before the waiting preloads, so it
+ * does not wait for a model that it might not use. A preload replaces a waiting
+ * preload of the same model, so only the newest selection loads. Returns the
+ * replaced request, which the caller must answer, or null.
+ */
+export function enqueueRequest(waiting, request) {
+  if (request?.type === 'preload') {
+    const same = waiting.findIndex((queued) => queued?.type === 'preload' && queued.model === request.model);
+    if (same !== -1) return waiting.splice(same, 1, request)[0];
+    waiting.push(request);
+    return null;
+  }
+  const firstPreload = waiting.findIndex((queued) => queued?.type === 'preload');
+  waiting.splice(firstPreload === -1 ? waiting.length : firstPreload, 0, request);
+  return null;
+}
+
 /** Adapt a Transformers.js `progress_callback` event to `createByteProgress`. */
 export function transformersProgressHandler(update) {
   return (event) => {

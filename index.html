@@ -14,7 +14,7 @@
     <h1>Speech Recognition &amp; Diarization</h1>
     <p class="subtitle">
       Speech-to-text with speaker labels, running entirely in your browser —
-      local Whisper and speaker-diarization models (one-time download, only when first needed).
+      local Whisper and speaker-diarization models (one-time download, which starts when the page opens).
       Your audio never leaves this device.
     </p>
 
@@ -54,18 +54,20 @@
         <select id="asrModelSelect" aria-describedby="asrModelHelp"></select>
         <p class="helper" id="asrModelHelp">
           Larger models make fewer mistakes, but they download more data and transcribe
-          more slowly. The model is used for the next transcription.
+          more slowly. The selected model starts to load one second after you select it,
+          and is used for the next transcription. Each model downloads only the first time; after that, it loads
+          from the browser cache.
         </p>
 
         <h3 class="section-label mt">Models</h3>
-        <div class="model-line" id="asrModel">Whisper tiny.en · speech-to-text · ~44 MB · runs locally</div>
-        <div class="model-line" id="diarModel">pyannote + WeSpeaker · speaker diarization · ~34 MB · runs locally</div>
+        <div class="model-line" id="asrModel"><span id="asrModelInfo">Whisper tiny.en · speech-to-text · ~44 MB · runs locally</span><span class="model-state" id="asrModelState"></span></div>
+        <div class="model-line" id="diarModel">pyannote + WeSpeaker · speaker diarization · ~34 MB · runs locally<span class="model-state" id="diarModelState"></span></div>
         <div class="track" id="track" role="progressbar" aria-label="Task progress" aria-valuemin="0" aria-valuemax="100" hidden>
           <div class="fill" id="fill"></div>
         </div>
 
         <div class="status" id="status" role="status" aria-live="polite" tabindex="-1">
-          Ready. Click “Start recording”, or transcribe an audio file. Models download the first time they are needed.
+          Ready. Click “Start recording”, or transcribe an audio file. The models load in the background.
         </div>
         <div class="buttons" id="retryRow" hidden>
           <button type="button" class="primary" id="retryBtn">Retry</button>

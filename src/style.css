@@ -155,6 +155,9 @@ select:disabled { opacity: 0.45; cursor: not-allowed; }
 /* Added: highlight the model in use; dim diarization while it is switched off. */
 .model-line.active { border-color: var(--accent); color: var(--text); }
 .model-line.off { opacity: 0.5; }
+/* Added: download state after the model details. */
+.model-state[data-state="queued"], .model-state[data-state="loading"] { color: var(--chosen); }
+.model-state[data-state="failed"] { color: var(--danger); }
 
 /* Progress bar (family track/fill). */
 .track {

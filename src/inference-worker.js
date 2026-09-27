@@ -5,11 +5,12 @@ import { env, pipeline } from '@huggingface/transformers';
 import * as ort from 'onnxruntime-web';
 import { DiarizationPipeline } from 'diarization-js';
 import ortWasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm?url';
-import { getAsrModel } from './asr-models.js';
+import { DEFAULT_ASR_MODEL, getAsrModel } from './asr-models.js';
 import {
   createByteProgress,
   createModelSlot,
   diarizationFraction,
+  enqueueRequest,
   readResponseBytes,
   runDiarize,
   runTranscribe,
@@ -39,13 +40,29 @@ function errorText(error) {
   return error?.message ?? String(error);
 }
 
-// Only one Whisper model is kept loaded: the one the last transcription used.
-// The slot key is the model entry from asr-models.js.
+/**
+ * Tell the page the state of a model load, whatever request started it:
+ * `{type: 'model', model: 'asr'|'diarization', asrModel?, state: 'loading'|'ready'|'failed', progress?}`.
+ */
+function postModelState(model, asrModel, state, progress) {
+  const event = { type: 'model', model, state };
+  if (asrModel) event.asrModel = asrModel;
+  if (Number.isFinite(progress)) event.progress = progress;
+  self.postMessage(event);
+}
+
+// Only one Whisper model is kept loaded: the one the last request used.
+// The slot key is a key of ASR_MODELS. Disposing a model frees its memory
+// only; its files stay in the Transformers.js browser cache.
 const asrSlot = createModelSlot({
-  load(model, report) {
+  load(key, report) {
+    const model = getAsrModel(key);
     const message = `Downloading the ${model.label} speech recognition model`;
-    report('asr-load', message, 0);
-    const onFraction = (fraction) => report('asr-load', message, fraction);
+    const onFraction = (fraction) => {
+      report('asr-load', message, fraction);
+      postModelState('asr', key, 'loading', fraction);
+    };
+    onFraction(0);
     // Stay a little below the file total so the bar can reach 100%.
     const expectedBytes = Math.floor(model.bytes * 0.999);
     return pipeline('automatic-speech-recognition', model.repo, {
@@ -53,13 +70,23 @@ const asrSlot = createModelSlot({
       device: 'wasm',
       dtype: 'q8',
       progress_callback: transformersProgressHandler(createByteProgress(expectedBytes, onFraction)),
-    }).catch((error) => {
+    }).then((asr) => {
+      postModelState('asr', key, 'ready');
+      return asr;
+    }, (error) => {
+      postModelState('asr', key, 'failed');
       throw new Error(`Could not load the ${model.label} speech recognition model (${errorText(error)}). `
         + 'Check the network connection, then try again.');
     });
   },
   dispose: (asr) => asr.dispose(),
 });
+
+/** The Whisper model for a key (no key: the default). An unknown key throws before the loaded model is disposed. */
+function loadAsr(key = DEFAULT_ASR_MODEL, report) {
+  getAsrModel(key);
+  return asrSlot(key, report);
+}
 
 async function openArtifactCache() {
   try {
@@ -86,15 +113,19 @@ async function fetchArtifact(cache, file, onBytes) {
 
 async function createDiarizer(report) {
   const message = 'Downloading the speaker detection models';
-  report('diarization-load', message, 0);
-  const update = createByteProgress(DIARIZATION_EXPECTED_BYTES,
-    (fraction) => report('diarization-load', message, fraction));
+  const onFraction = (fraction) => {
+    report('diarization-load', message, fraction);
+    postModelState('diarization', null, 'loading', fraction);
+  };
+  onFraction(0);
+  const update = createByteProgress(DIARIZATION_EXPECTED_BYTES, onFraction);
   const cache = await openArtifactCache();
   const [segmentationModel, embeddingModel, pldaBytes] = await Promise.all(
     Object.values(DIARIZATION_FILES).map((file) =>
       fetchArtifact(cache, file, (loaded, total) => update(file, loaded, total))),
   );
   report('diarization-load', 'Preparing the speaker detection models');
+  postModelState('diarization', null, 'loading');
   return DiarizationPipeline.create({
     ort,
     segmentationModel,
@@ -112,18 +143,41 @@ async function createDiarizer(report) {
 }
 
 function loadDiarizer(report) {
-  diarizerPromise ??= createDiarizer(report).catch((error) => {
+  diarizerPromise ??= createDiarizer(report).then((diarizer) => {
+    postModelState('diarization', null, 'ready');
+    return diarizer;
+  }, (error) => {
     diarizerPromise = null;
+    postModelState('diarization', null, 'failed');
     throw new Error(`Could not load the speaker detection models (${errorText(error)}). `
       + 'Check the network connection, then try again.');
   });
   return diarizerPromise;
 }
 
+/**
+ * Handle a `preload` request: load one model now, so a later task does not wait
+ * for it. `ready` is sent here too, because a model that is already loaded sends
+ * no model messages of its own.
+ */
+async function preload(message, report) {
+  if (message.model === 'asr') {
+    const key = message.asrModel ?? DEFAULT_ASR_MODEL;
+    await loadAsr(key, report);
+    postModelState('asr', key, 'ready');
+  } else if (message.model === 'diarization') {
+    await loadDiarizer(report);
+    postModelState('diarization', null, 'ready');
+  } else {
+    throw new Error(`Unknown model to preload: ${message.model}`);
+  }
+  return {};
+}
+
 function createBackend(report, asrModelKey) {
   return {
     async transcribe(audio) {
-      const asr = await asrSlot(getAsrModel(asrModelKey), report);
+      const asr = await loadAsr(asrModelKey, report);
       report('asr', 'Transcribing');
       try {
         const output = await asr(audio, { return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
@@ -161,6 +215,8 @@ async function handle(message) {
       result = await runTranscribe(message, backend);
     } else if (type === 'diarize') {
       result = await runDiarize(message, backend);
+    } else if (type === 'preload') {
+      result = await preload(message, report);
     } else {
       throw new Error(`Unknown request type: ${type}`);
     }
@@ -170,8 +226,23 @@ async function handle(message) {
   }
 }
 
-// One task at a time: each request waits for the previous one to finish.
-let queue = Promise.resolve();
+// One request at a time, preloads included, so the Whisper slot never switches
+// models mid-task. `enqueueRequest` sets the order of the waiting requests.
+const waiting = [];
+let running = false;
+
+async function drain() {
+  running = true;
+  try {
+    while (waiting.length) await handle(waiting.shift());
+  } finally {
+    running = false;
+  }
+}
+
 self.addEventListener('message', (event) => {
-  queue = queue.then(() => handle(event.data));
+  const replaced = enqueueRequest(waiting, event.data);
+  // A newer preload of the same model took its place before it started.
+  if (replaced) self.postMessage({ type: 'result', id: replaced.id });
+  if (!running) drain();
 });
