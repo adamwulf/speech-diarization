@@ -26,11 +26,11 @@
           <button type="button" class="primary" id="micBtn">Start recording</button>
           <button type="button" id="fileBtn">Transcribe file…</button>
           <button type="button" id="clearBtn" disabled>Clear</button>
-          <!-- Hidden picker; fileBtn opens it. Any format the browser can decode (m4a, mp3, wav…). -->
-          <input type="file" id="fileInput" accept="audio/*" hidden />
+          <!-- Hidden picker; fileBtn opens it. Any audio, or video with an audio track, that the browser can decode (m4a, mp3, wav, mp4…). -->
+          <input type="file" id="fileInput" accept="audio/*,video/*" hidden />
         </div>
         <p class="helper">
-          Record, then click “Stop recording” to transcribe — or pick an audio file.
+          Record, then click “Stop recording” to transcribe — or pick an audio or video file.
           Each new recording or file replaces the current audio, transcript, and speaker names.
         </p>
 
@@ -67,7 +67,7 @@
         </div>
 
         <div class="status" id="status" role="status" aria-live="polite" tabindex="-1">
-          Ready. Click “Start recording”, or transcribe an audio file. The models load in the background.
+          Ready. Click “Start recording”, or transcribe an audio or video file. The models load in the background.
         </div>
         <div class="buttons" id="retryRow" hidden>
           <button type="button" class="primary" id="retryBtn">Retry</button>
@@ -93,7 +93,7 @@
         </div>
 
         <p class="empty" id="transcriptEmpty">
-          No transcript yet. Record or choose an audio file to get started.
+          No transcript yet. Record or choose an audio or video file to get started.
         </p>
         <ol class="turns" id="transcriptList" aria-label="Transcript turns" hidden></ol>
 

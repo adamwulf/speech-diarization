@@ -474,7 +474,7 @@ function renderTranscript() {
   transcriptEmpty.hidden = hasTurns;
   transcriptEmpty.textContent = state.source
     ? 'No speech was detected in this audio.'
-    : 'No transcript yet. Record or choose an audio file to get started.';
+    : 'No transcript yet. Record or choose an audio or video file to get started.';
 }
 
 function render() {
@@ -778,7 +778,7 @@ clearBtn.addEventListener('click', () => {
   state.speakerNames = new Map();
   setRetry(null);
   render();
-  setStatus('Cleared. Click “Start recording”, or transcribe an audio file.');
+  setStatus('Cleared. Click “Start recording”, or transcribe an audio or video file.');
 });
 
 retryBtn.addEventListener('click', () => {

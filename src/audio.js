@@ -1,5 +1,6 @@
-// Main-thread audio: decoding any browser-supported audio to 16 kHz mono PCM,
-// microphone capture with MediaRecorder, and the native-canvas level meter.
+// Main-thread audio: decoding any browser-supported audio (or the audio track of
+// a video) to 16 kHz mono PCM, microphone capture with MediaRecorder, and the
+// native-canvas level meter.
 
 export const TARGET_SAMPLE_RATE = 16000;
 
@@ -13,6 +14,8 @@ export class UserFacingError extends Error {
 
 /**
  * Decodes a recording or file and returns 16 kHz mono PCM (Float32Array).
+ * decodeAudioData can also read the audio track of some video files (for
+ * example, MP4 in Chrome); browser support for video containers varies.
  * Decoding in an OfflineAudioContext resamples to 16 kHz; rendering through a
  * 1-channel context then down-mixes with the standard Web Audio rules.
  */
@@ -34,7 +37,7 @@ export async function decodeToMono16k(blob) {
   try {
     decoded = await new OfflineAudioContext(1, 1, TARGET_SAMPLE_RATE).decodeAudioData(data);
   } catch (cause) {
-    throw new UserFacingError('This audio could not be decoded. Try a common format such as WAV, MP3, M4A, or WebM.', { cause });
+    throw new UserFacingError('This file could not be decoded. Try a common format such as WAV, MP3, M4A, WebM, or MP4. A video file must have an audio track.', { cause });
   }
 
   const length = Math.round(decoded.duration * TARGET_SAMPLE_RATE);
