@@ -45,6 +45,11 @@ or HTTPS. Transcribing a file works on any origin.
   - On again: names come back. If the current transcript has no speaker data
     yet, speaker detection runs on the retained audio. The transcript text is
     not transcribed again.
+  - If a new recording or file failed and **Retry transcription** is showing,
+    the checkbox only sets what the retry does. It does not start work on the
+    older transcript.
+  - If speaker detection runs but cannot identify any speaker, the page says
+    so and shows the transcript without speaker names.
 - **Speakers** get default names (“Speaker 1”, “Speaker 2”, …) in order of
   first appearance. Type a new name to update every matching turn and both
   exports. Clear the field to use the default name again. Segments that could

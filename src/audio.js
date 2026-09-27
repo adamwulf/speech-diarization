@@ -72,8 +72,12 @@ function microphoneErrorMessage(error) {
  * - `stop()`: finishes recording and resolves to the recorded Blob.
  * - `release()`: discards the recording.
  * Both stop() and release() stop every track and close the meter's context.
- * `onInterrupted` fires if the recorder errors or the device goes away, so the
- * page can call stop() and keep whatever was captured.
+ * `onInterrupted` fires when recording ends without the page asking, so the
+ * page can call stop() and leave the recording state:
+ * - an audio track ended (e.g. the device was unplugged): stop() resolves
+ *   with the audio captured so far;
+ * - the recorder reported an error: stop() rejects with a UserFacingError and
+ *   the partial audio is discarded.
  */
 export async function startMicrophone({ onInterrupted } = {}) {
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {

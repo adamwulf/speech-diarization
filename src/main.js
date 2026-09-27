@@ -161,8 +161,18 @@ function plural(count, noun) {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
-function showSpeakers() {
+/** Speaker detection is on and has run on the current transcript. */
+function speakersDetected() {
   return speakersToggle.checked && state.diarized;
+}
+
+/**
+ * Show speaker labels only when detection found at least one speaker; if
+ * every segment is unattributed, the transcript keeps plain per-segment
+ * timestamps instead of one merged "Unknown speaker" turn.
+ */
+function showSpeakers() {
+  return speakersDetected() && speakerOrder(state.segments).length > 0;
 }
 
 function keptNote() {
@@ -264,6 +274,9 @@ function updateControls() {
   fileBtn.disabled = !idle;
   clearBtn.disabled = !idle || (!state.source && !state.retry);
   speakersToggle.disabled = !idle;
+  // Hiding or disabling the focused Retry button would drop keyboard focus to
+  // the page; park it on the status line, which announces what happens next.
+  if (retryRow.contains(document.activeElement) && (!state.retry || !idle)) statusEl.focus();
   retryRow.hidden = !state.retry;
   retryBtn.disabled = !idle;
 
@@ -395,7 +408,7 @@ function render() {
 }
 
 function doneMessage() {
-  if (showSpeakers()) {
+  if (speakersDetected()) {
     const count = speakerOrder(state.segments).length;
     return count
       ? `Done — ${plural(count, 'speaker')} detected. Rename speakers or export the transcript.`
@@ -639,6 +652,16 @@ retryBtn.addEventListener('click', () => {
 
 speakersToggle.addEventListener('change', () => {
   if (state.phase !== 'idle') return;
+  // A failed new recording or file is waiting for "Retry transcription", which
+  // reads this setting when it runs. Keep that retry, and don't start
+  // speaker detection on the older transcript still on screen.
+  if (state.retry?.kind === 'transcribe') {
+    render();
+    setStatus(speakersToggle.checked
+      ? '“Detect speakers” is on: “Retry transcription” will also detect speakers in the new audio.'
+      : '“Detect speakers” is off: “Retry transcription” will skip speaker detection, and speaker names are hidden.');
+    return;
+  }
   if (!speakersToggle.checked) {
     if (state.retry?.kind === 'diarize') setRetry(null);
     render();
@@ -652,7 +675,11 @@ speakersToggle.addEventListener('change', () => {
     return;
   }
   render();
-  if (state.source && state.diarized) setStatus('Speaker names are shown in the transcript and exports.');
+  if (state.source && state.diarized) {
+    setStatus(showSpeakers()
+      ? 'Speaker names are shown in the transcript and exports.'
+      : 'No speakers were identified in this audio, so the transcript has no speaker names.');
+  }
 });
 
 exportMdBtn.addEventListener('click', () => download('markdown'));

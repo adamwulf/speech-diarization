@@ -162,6 +162,8 @@ input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px
 
 /* Status line */
 .status { min-height: 24px; color: var(--muted); font-size: 17px; margin-top: 16px; overflow-wrap: anywhere; }
+/* Added: focus target when the Retry button disappears; not interactive itself. */
+.status:focus { outline: none; }
 .status.error { color: var(--danger); }
 .status.warning { color: var(--chosen); }
 .meta-value { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--chosen); }
