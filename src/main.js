@@ -464,7 +464,7 @@ async function processSource({ blob, kind, name }) {
 
 async function transcribe(candidate) {
   const speakers = speakersToggle.checked;
-  const model = asrModelSelect.value;
+  const asrModelKey = asrModelSelect.value;
   state.phase = 'busy';
   setRetry(null);
   updateControls();
@@ -474,7 +474,7 @@ async function transcribe(candidate) {
   let result;
   try {
     result = await inference.run(
-      { type: 'transcribe', audio: candidate.audio, speakers, asrModel: model },
+      { type: 'transcribe', audio: candidate.audio, speakers, asrModel: asrModelKey },
       handleProgress,
     );
   } catch (error) {
@@ -728,7 +728,8 @@ window.addEventListener('pagehide', () => {
 
 // ---- Startup ----
 for (const [key, model] of Object.entries(ASR_MODELS)) {
-  asrModelSelect.add(new Option(`${model.level} — ${model.label} (${downloadSize(model.bytes)})`, key));
+  // Short text, so it fits a phone-width select; the model line shows the full name.
+  asrModelSelect.add(new Option(`${model.level} — ${key} (${downloadSize(model.bytes)})`, key));
 }
 asrModelSelect.value = DEFAULT_ASR_MODEL;
 renderAsrModel();

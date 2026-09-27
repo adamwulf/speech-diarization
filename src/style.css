@@ -248,6 +248,8 @@ audio { display: block; width: 100%; }
   .buttons { gap: 10px; }
   .buttons button { flex: 1 1 auto; }
   button { font-size: 18px; padding: 12px 16px; }
+  /* 16px keeps iOS from zooming in when the select gets focus. */
+  select { font-size: 16px; padding: 10px 12px; }
   .check label { font-size: 18px; }
   .speaker-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }

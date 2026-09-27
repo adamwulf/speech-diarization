@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createByteProgress,
+  createModelSlot,
   diarizationFraction,
   hasSpeechEnergy,
   readResponseBytes,
@@ -217,4 +218,60 @@ test('diarizationFraction maps pipeline steps to one increasing 0..1 value', () 
   for (let i = 1; i < steps.length; i++) assert.ok(steps[i] > steps[i - 1]);
   assert.equal(diarizationFraction({ step: 'unknown', fraction: 1 }), 0);
   assert.equal(diarizationFraction({ step: 'embedding', fraction: NaN }), 0.25);
+});
+
+function fakeModelSlot({ failLoads = new Set(), disposeError } = {}) {
+  const events = [];
+  const get = createModelSlot({
+    async load(key, context) {
+      events.push(`load ${key} ${context}`);
+      if (failLoads.has(key)) {
+        failLoads.delete(key);
+        throw new Error(`load ${key} failed`);
+      }
+      return { key };
+    },
+    async dispose(model) {
+      events.push(`dispose ${model.key}`);
+      if (disposeError) throw disposeError;
+    },
+  });
+  return { get, events };
+}
+
+test('createModelSlot loads a model once and reuses it for the same key', async () => {
+  const { get, events } = fakeModelSlot();
+  const first = await get('tiny', 'a');
+  const second = await get('tiny', 'b');
+  assert.equal(second, first);
+  assert.deepEqual(events, ['load tiny a']);
+});
+
+test('createModelSlot disposes the loaded model before it loads a different one', async () => {
+  const { get, events } = fakeModelSlot();
+  await get('tiny', 'a');
+  assert.deepEqual(await get('small', 'b'), { key: 'small' });
+  assert.deepEqual(await get('tiny', 'c'), { key: 'tiny' });
+  assert.deepEqual(events, ['load tiny a', 'dispose tiny', 'load small b', 'dispose small', 'load tiny c']);
+});
+
+test('createModelSlot tries a failed load again on the next request', async () => {
+  const { get, events } = fakeModelSlot({ failLoads: new Set(['small']) });
+  await assert.rejects(get('small', 'a'), /load small failed/);
+  assert.deepEqual(await get('small', 'b'), { key: 'small' });
+  assert.deepEqual(events, ['load small a', 'load small b']);
+});
+
+test('createModelSlot has nothing to dispose after a failed load', async () => {
+  const { get, events } = fakeModelSlot({ failLoads: new Set(['small']) });
+  await assert.rejects(get('small', 'a'), /load small failed/);
+  assert.deepEqual(await get('tiny', 'b'), { key: 'tiny' });
+  assert.deepEqual(events, ['load small a', 'load tiny b']);
+});
+
+test('createModelSlot still loads the new model when dispose fails', async () => {
+  const { get, events } = fakeModelSlot({ disposeError: new Error('dispose failed') });
+  await get('tiny', 'a');
+  assert.deepEqual(await get('small', 'b'), { key: 'small' });
+  assert.deepEqual(events, ['load tiny a', 'dispose tiny', 'load small b']);
 });

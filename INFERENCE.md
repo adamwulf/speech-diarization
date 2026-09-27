@@ -10,7 +10,7 @@ contract, the model choices, and the runtime facts that were verified.
 |---|---|
 | `src/inference-worker.js` | Loads the models, handles `transcribe` and `diarize` messages, one task at a time. |
 | `src/asr-models.js` | The Whisper models that the user can select (repository, revision, download bytes). The page uses it too. |
-| `src/inference-tasks.js` | Task flow with injected model calls, silence check, progress helpers. |
+| `src/inference-tasks.js` | Task flow with injected model calls, silence check, progress helpers, the one-model slot for Whisper. |
 | `src/alignment.js` | Word timestamp cleanup, speaker assignment, cue grouping. |
 | `tests/inference-tasks.test.js`, `tests/alignment.test.js`, `tests/asr-models.test.js` | Node tests with fake models. |
 
@@ -21,7 +21,8 @@ Create the worker with
 ## Contract additions
 
 - A `transcribe` request can have `asrModel: 'tiny.en' | 'base.en' | 'small.en'`.
-  Without it, the worker uses `tiny.en`. An unknown value gives `{type: 'error'}`.
+  Without it, the worker uses `tiny.en`. An unknown value gives `{type: 'error'}` when
+  Whisper runs (silent or too-short audio returns its result before that).
   `diarize` requests ignore it.
 - Each result segment also has `words: [{start, end, text}]`. Word `text` keeps one
   leading space when Whisper put a space before the word. Some words attach with no

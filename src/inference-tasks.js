@@ -86,6 +86,35 @@ export function createByteProgress(expectedBytes, onFraction, step = 0.01) {
   };
 }
 
+/**
+ * Keep one loaded model at a time. `get(key, context)` returns the model for
+ * `key`, loaded with `load(key, context)` on first use. A different key first
+ * disposes the loaded model, so two models are never in memory together.
+ * A failed load is not kept, so the next `get` tries again.
+ */
+export function createModelSlot({ load, dispose }) {
+  let current = null; // {key, promise}
+  return async function get(key, context) {
+    if (current && current.key !== key) {
+      const { promise } = current;
+      current = null;
+      // If dispose fails, the new model can still load, so that error is not reported.
+      await promise.then(dispose).catch(() => {});
+    }
+    if (!current) {
+      const entry = { key };
+      entry.promise = Promise.resolve()
+        .then(() => load(key, context))
+        .catch((error) => {
+          if (current === entry) current = null;
+          throw error;
+        });
+      current = entry;
+    }
+    return current.promise;
+  };
+}
+
 /** Adapt a Transformers.js `progress_callback` event to `createByteProgress`. */
 export function transformersProgressHandler(update) {
   return (event) => {

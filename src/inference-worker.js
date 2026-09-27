@@ -8,6 +8,7 @@ import ortWasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threa
 import { getAsrModel } from './asr-models.js';
 import {
   createByteProgress,
+  createModelSlot,
   diarizationFraction,
   readResponseBytes,
   runDiarize,
@@ -32,44 +33,33 @@ const DIARIZATION_FILES = {
 const DIARIZATION_EXPECTED_BYTES = 33_494_108;
 const DIARIZATION_CACHE = 'diarization-js-community-1';
 
-// Only one Whisper model is kept loaded: the one the last transcription used.
-let asrModel = null;
-let asrPromise = null;
 let diarizerPromise = null;
 
 function errorText(error) {
   return error?.message ?? String(error);
 }
 
-async function loadAsr(key, report) {
-  const model = getAsrModel(key);
-  if (asrPromise && asrModel !== model) {
-    const previous = asrPromise;
-    asrPromise = null;
-    // Free the old model's memory before the new one loads. If dispose fails,
-    // the new model can still load, so that error is not reported.
-    await previous.then((asr) => asr.dispose()).catch(() => {});
-  }
-  if (!asrPromise) {
+// Only one Whisper model is kept loaded: the one the last transcription used.
+// The slot key is the model entry from asr-models.js.
+const asrSlot = createModelSlot({
+  load(model, report) {
     const message = `Downloading the ${model.label} speech recognition model`;
     report('asr-load', message, 0);
     const onFraction = (fraction) => report('asr-load', message, fraction);
     // Stay a little below the file total so the bar can reach 100%.
     const expectedBytes = Math.floor(model.bytes * 0.999);
-    asrModel = model;
-    asrPromise = pipeline('automatic-speech-recognition', model.repo, {
+    return pipeline('automatic-speech-recognition', model.repo, {
       revision: model.revision,
       device: 'wasm',
       dtype: 'q8',
       progress_callback: transformersProgressHandler(createByteProgress(expectedBytes, onFraction)),
     }).catch((error) => {
-      asrPromise = null;
       throw new Error(`Could not load the ${model.label} speech recognition model (${errorText(error)}). `
         + 'Check the network connection, then try again.');
     });
-  }
-  return asrPromise;
-}
+  },
+  dispose: (asr) => asr.dispose(),
+});
 
 async function openArtifactCache() {
   try {
@@ -133,7 +123,7 @@ function loadDiarizer(report) {
 function createBackend(report, asrModelKey) {
   return {
     async transcribe(audio) {
-      const asr = await loadAsr(asrModelKey, report);
+      const asr = await asrSlot(getAsrModel(asrModelKey), report);
       report('asr', 'Transcribing');
       try {
         const output = await asr(audio, { return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
