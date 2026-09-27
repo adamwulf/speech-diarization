@@ -181,8 +181,9 @@ function createBackend(report, asrModelKey) {
     async transcribe(audio) {
       const asr = await loadAsr(asrModelKey, report);
       // Transformers.js first computes the audio features of every window (no
-      // progress), then runs generate() once per window. generate() calls the
-      // streamer's put() as it produces tokens and end() when the window is done.
+      // progress), then runs generate() once per window. generate() runs the
+      // window's encoder, calls the streamer's put() with the prompt tokens and
+      // then with each new token, and calls end() when the window is done.
       report('asr', 'Preparing transcription');
       const windows = asrWindowCount(audio.length);
       let started = false;
