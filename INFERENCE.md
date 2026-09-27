@@ -9,9 +9,10 @@ contract, the model choices, and the runtime facts that were verified.
 | File | Purpose |
 |---|---|
 | `src/inference-worker.js` | Loads the models, handles `transcribe` and `diarize` messages, one task at a time. |
-| `src/inference-tasks.js` | Task flow with injected model calls, silence check, progress helpers. |
+| `src/asr-models.js` | The Whisper models that the user can select (repository, revision, download bytes). The page uses it too. |
+| `src/inference-tasks.js` | Task flow with injected model calls, silence check, progress helpers, the one-model slot for Whisper. |
 | `src/alignment.js` | Word timestamp cleanup, speaker assignment, cue grouping. |
-| `tests/inference-tasks.test.js`, `tests/alignment.test.js` | Node tests with fake models. |
+| `tests/inference-tasks.test.js`, `tests/alignment.test.js`, `tests/asr-models.test.js` | Node tests with fake models. |
 
 Create the worker with
 `new Worker(new URL('./inference-worker.js', import.meta.url), { type: 'module' })`.
@@ -19,6 +20,10 @@ Create the worker with
 
 ## Contract additions
 
+- A `transcribe` request can have `asrModel: 'tiny.en' | 'base.en' | 'small.en'`.
+  Without it, the worker uses `tiny.en`. An unknown value gives `{type: 'error'}` when
+  Whisper runs (silent or too-short audio returns its result before that).
+  `diarize` requests ignore it.
 - Each result segment also has `words: [{start, end, text}]`. Word `text` keeps one
   leading space when Whisper put a space before the word. Some words attach with no
   space (for example `-known` after `well`). Segment `text` is the word texts joined
@@ -36,17 +41,26 @@ Create the worker with
 - Progress: `asr-load`, `diarization-load`, and `diarization` send `progress` 0..1.
   `asr` has no `progress` (indeterminate).
 - Model loads are kept for the life of the worker. A failed load is tried again on the
-  next request.
+  next request. The worker keeps one Whisper model: when a request selects a different
+  one, the worker disposes the old model, then loads the new one.
 
 ## Models
 
 | Use | Source | Download |
 |---|---|---|
-| ASR | `onnx-community/whisper-tiny.en_timestamped` at revision `aeaa1376…`, `dtype: 'q8'`, `device: 'wasm'` | 43.5 MB, Transformers.js browser cache |
+| ASR `tiny.en` (default) | `onnx-community/whisper-tiny.en_timestamped` at revision `aeaa1376…` | 43.5 MB, Transformers.js browser cache |
+| ASR `base.en` | `onnx-community/whisper-base.en_timestamped` at revision `fa239a41…` | 79.6 MB, Transformers.js browser cache |
+| ASR `small.en` | `onnx-community/whisper-small.en_timestamped` at revision `80853938…` | 251.7 MB, Transformers.js browser cache |
 | Diarization | `diarization-js@0.1.0` with `briox/diarization-js-community-1` at revision `7f02c43a…` | 33.5 MB, Cache API `diarization-js-community-1` |
 
+- All ASR models load with `dtype: 'q8'` and `device: 'wasm'`. The download is
+  `encoder_model_quantized.onnx`, `decoder_model_merged_quantized.onnx`, and the config
+  and tokenizer files. Each `_timestamped` export has `alignment_heads` in its
+  `generation_config.json`.
 - The `_timestamped` export has the cross-attention outputs that word timestamps need.
   Do not pass `language` or `task`: Transformers.js 3.8.1 throws for English-only models.
+- The browser checks below used only `tiny.en`. `base.en` and `small.en` use the same
+  code path, but they were not run in a browser.
 - The ASR call is `{return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5}`.
   Without `chunk_length_s`, audio after 30 s is lost.
 - diarization-js is a port of `pyannote/speaker-diarization-community-1`:

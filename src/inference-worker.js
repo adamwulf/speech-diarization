@@ -5,8 +5,10 @@ import { env, pipeline } from '@huggingface/transformers';
 import * as ort from 'onnxruntime-web';
 import { DiarizationPipeline } from 'diarization-js';
 import ortWasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm?url';
+import { getAsrModel } from './asr-models.js';
 import {
   createByteProgress,
+  createModelSlot,
   diarizationFraction,
   readResponseBytes,
   runDiarize,
@@ -21,12 +23,6 @@ import {
 ort.env.wasm.wasmPaths = { wasm: ortWasmUrl };
 env.allowLocalModels = false;
 
-const ASR_MODEL = 'onnx-community/whisper-tiny.en_timestamped';
-const ASR_REVISION = 'aeaa13760958b03fac5062f457d317d3319c3168';
-// encoder_model_quantized + decoder_model_merged_quantized + tokenizer/config
-// files are 43,519,516 bytes. Stay a little below so the bar can reach 100%.
-const ASR_EXPECTED_BYTES = 43_500_000;
-
 const DIARIZATION_BASE_URL =
   'https://huggingface.co/briox/diarization-js-community-1/resolve/7f02c43a14eff6d4dea0a4f8099f1ca48eb163b8/';
 const DIARIZATION_FILES = {
@@ -37,30 +33,33 @@ const DIARIZATION_FILES = {
 const DIARIZATION_EXPECTED_BYTES = 33_494_108;
 const DIARIZATION_CACHE = 'diarization-js-community-1';
 
-let asrPromise = null;
 let diarizerPromise = null;
 
 function errorText(error) {
   return error?.message ?? String(error);
 }
 
-function loadAsr(report) {
-  if (!asrPromise) {
-    report('asr-load', 'Downloading the speech recognition model', 0);
-    const onFraction = (fraction) => report('asr-load', 'Downloading the speech recognition model', fraction);
-    asrPromise = pipeline('automatic-speech-recognition', ASR_MODEL, {
-      revision: ASR_REVISION,
+// Only one Whisper model is kept loaded: the one the last transcription used.
+// The slot key is the model entry from asr-models.js.
+const asrSlot = createModelSlot({
+  load(model, report) {
+    const message = `Downloading the ${model.label} speech recognition model`;
+    report('asr-load', message, 0);
+    const onFraction = (fraction) => report('asr-load', message, fraction);
+    // Stay a little below the file total so the bar can reach 100%.
+    const expectedBytes = Math.floor(model.bytes * 0.999);
+    return pipeline('automatic-speech-recognition', model.repo, {
+      revision: model.revision,
       device: 'wasm',
       dtype: 'q8',
-      progress_callback: transformersProgressHandler(createByteProgress(ASR_EXPECTED_BYTES, onFraction)),
+      progress_callback: transformersProgressHandler(createByteProgress(expectedBytes, onFraction)),
     }).catch((error) => {
-      asrPromise = null;
-      throw new Error(`Could not load the speech recognition model (${errorText(error)}). `
+      throw new Error(`Could not load the ${model.label} speech recognition model (${errorText(error)}). `
         + 'Check the network connection, then try again.');
     });
-  }
-  return asrPromise;
-}
+  },
+  dispose: (asr) => asr.dispose(),
+});
 
 async function openArtifactCache() {
   try {
@@ -121,10 +120,10 @@ function loadDiarizer(report) {
   return diarizerPromise;
 }
 
-function createBackend(report) {
+function createBackend(report, asrModelKey) {
   return {
     async transcribe(audio) {
-      const asr = await loadAsr(report);
+      const asr = await asrSlot(getAsrModel(asrModelKey), report);
       report('asr', 'Transcribing');
       try {
         const output = await asr(audio, { return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
@@ -157,10 +156,11 @@ async function handle(message) {
   };
   try {
     let result;
+    const backend = createBackend(report, message?.asrModel);
     if (type === 'transcribe') {
-      result = await runTranscribe(message, createBackend(report));
+      result = await runTranscribe(message, backend);
     } else if (type === 'diarize') {
-      result = await runDiarize(message, createBackend(report));
+      result = await runDiarize(message, backend);
     } else {
       throw new Error(`Unknown request type: ${type}`);
     }

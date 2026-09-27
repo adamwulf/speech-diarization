@@ -3,7 +3,7 @@
 ## Success criteria
 
 - Match the speech-ai-demo recognition page colors, typography, panels, buttons, mic meter, and model progress UI; no TTS.
-- Record microphone audio or select a browser-decodable audio file, and transcribe in a Web Worker with Whisper tiny.en.
+- Record microphone audio or select a browser-decodable audio file, and transcribe in a Web Worker with the selected Whisper model (tiny.en by default, base.en, or small.en).
 - Optional diarization entirely in the browser, including consistent speaker identities across model windows.
 - Checkbox disables speaker detection for new work and hides speaker labels in existing results and exports; re-enabling on a transcript without speaker data runs diarization on retained audio.
 - Rename detected speakers, reflected in every matching transcript turn and both exports.
@@ -17,7 +17,7 @@ Use vanilla JavaScript modules with Vite. Main thread owns microphone/file decod
 
 `src/inference-worker.js` incoming messages:
 
-- `{type: 'transcribe', id, audio: Float32Array, speakers: boolean}`
+- `{type: 'transcribe', id, audio: Float32Array, speakers: boolean, asrModel?: 'tiny.en'|'base.en'|'small.en'}` (default `tiny.en`)
 - `{type: 'diarize', id, audio: Float32Array, segments: TranscriptSegment[]}` for an existing transcript
 
 Outgoing:
