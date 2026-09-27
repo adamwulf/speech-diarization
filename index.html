@@ -25,7 +25,6 @@
         <div class="buttons">
           <button type="button" class="primary" id="micBtn">Start recording</button>
           <button type="button" id="fileBtn">Transcribe file…</button>
-          <button type="button" id="clearBtn" disabled>Clear</button>
           <!-- Hidden picker; fileBtn opens it. Any audio, or video with an audio track, that the browser can decode (m4a, mp3, wav, mp4…). -->
           <input type="file" id="fileInput" accept="audio/*,video/*" hidden />
         </div>
@@ -100,6 +99,7 @@
         <div class="buttons">
           <button type="button" id="exportMdBtn" disabled>Export Markdown</button>
           <button type="button" id="exportVttBtn" disabled>Export WebVTT</button>
+          <button type="button" id="clearBtn" disabled>Clear</button>
         </div>
       </section>
     </main>
