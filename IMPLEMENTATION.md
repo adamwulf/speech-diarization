@@ -26,7 +26,7 @@ Outgoing:
 - `{type: 'result', id, segments: TranscriptSegment[], diarized: boolean, warning?: string}`
 - `{type: 'error', id, message}`
 
-`TranscriptSegment`: `{start: number, end: number, text: string, speaker: string|null}`. Times are seconds, finite, nonnegative, end > start. Speaker IDs are stable strings within one source audio. Text contains words joined naturally. No speaker names stored in worker; names belong to UI map.
+`TranscriptSegment`: `{start: number, end: number, text: string, speaker: string|null, words: Array<{start: number, end: number, text: string}>}`. Times are seconds, finite, nonnegative, end > start. Speaker IDs are stable strings within one source audio. Text contains words joined naturally. Word timings are retained in each grouped cue so enabling speaker detection later can split it at speaker boundaries without transcribing again. The UI preserves the original worker segments for `diarize` requests and uses normalized copies for display/export. No speaker names stored in worker; names belong to UI map.
 
 Main thread keeps the decoded PCM for re-diarization, so post copies (do not transfer/detach its sole buffer). Results replace the current recording/file; this is explained in UI. Unrecognized speakers stay null, not silently assigned to the first speaker. On diarization failure after ASR, return transcript with `diarized:false` and a warning so text is retained. ASR uses word timestamps for speaker assignment; public result may group adjacent words into useful subtitle cues.
 
