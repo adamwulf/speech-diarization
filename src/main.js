@@ -565,7 +565,12 @@ async function processSource({ blob, kind, name }) {
 
   let audio;
   try {
-    audio = await decodeToMono16k(blob);
+    audio = await decodeToMono16k(blob, {
+      onProgress: (fraction) => {
+        setProgress(fraction);
+        setStatus('Decoding audio…', { value: `${Math.round(fraction * 100)}%` });
+      },
+    });
   } catch (error) {
     const detail = error instanceof UserFacingError ? error.message : `The audio could not be decoded: ${messageOf(error)}`;
     finishTask();
