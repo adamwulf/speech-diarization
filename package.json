@@ -12,10 +12,15 @@
   "dependencies": {
     "@huggingface/transformers": "3.8.1",
     "diarization-js": "0.1.0",
-    "onnxruntime-web": "1.22.0-dev.20250409-89f8206ba4"
+    "onnxruntime-web": "1.22.0"
   },
   "devDependencies": {
     "vite": "^7.1.0",
     "@playwright/test": "^1.55.0"
+  },
+  "overrides": {
+    "@huggingface/transformers": {
+      "onnxruntime-web": "$onnxruntime-web"
+    }
   }
 }
