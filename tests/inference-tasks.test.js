@@ -233,6 +233,10 @@ function fakeModelSlot({ failLoads = new Set(), disposeError } = {}) {
     },
     async dispose(model) {
       events.push(`dispose ${model.key}`);
+      // Finish in a later macrotask, like an async session release, so a load
+      // that does not wait for the dispose would come before "disposed".
+      await new Promise((resolve) => setImmediate(resolve));
+      events.push(`disposed ${model.key}`);
       if (disposeError) throw disposeError;
     },
   });
@@ -252,7 +256,11 @@ test('createModelSlot disposes the loaded model before it loads a different one'
   await get('tiny', 'a');
   assert.deepEqual(await get('small', 'b'), { key: 'small' });
   assert.deepEqual(await get('tiny', 'c'), { key: 'tiny' });
-  assert.deepEqual(events, ['load tiny a', 'dispose tiny', 'load small b', 'dispose small', 'load tiny c']);
+  assert.deepEqual(events, [
+    'load tiny a',
+    'dispose tiny', 'disposed tiny', 'load small b',
+    'dispose small', 'disposed small', 'load tiny c',
+  ]);
 });
 
 test('createModelSlot tries a failed load again on the next request', async () => {
@@ -273,5 +281,5 @@ test('createModelSlot still loads the new model when dispose fails', async () =>
   const { get, events } = fakeModelSlot({ disposeError: new Error('dispose failed') });
   await get('tiny', 'a');
   assert.deepEqual(await get('small', 'b'), { key: 'small' });
-  assert.deepEqual(events, ['load tiny a', 'dispose tiny', 'load small b']);
+  assert.deepEqual(events, ['load tiny a', 'dispose tiny', 'disposed tiny', 'load small b']);
 });
