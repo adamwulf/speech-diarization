@@ -407,14 +407,31 @@ function render() {
   updateControls();
 }
 
-function doneMessage() {
-  if (speakersDetected()) {
-    const count = speakerOrder(state.segments).length;
-    return count
-      ? `Done — ${plural(count, 'speaker')} detected. Rename speakers or export the transcript.`
-      : 'Done — no speakers could be identified. The transcript is shown without speaker names.';
+/** Status after a successful task. `warning` is the worker's optional note. */
+function setDoneStatus(warning) {
+  const count = speakerOrder(state.segments).length;
+  if (speakersDetected() && !count) {
+    // Say explicitly that detection ran but found nobody.
+    setStatus(sentences(
+      'Done',
+      warning || 'No speakers could be identified',
+      'The transcript is shown without speaker names',
+    ), { tone: 'warning' });
+    return;
   }
-  return 'Done. Export the transcript below.';
+  const done = speakersDetected()
+    ? `Done — ${plural(count, 'speaker')} detected. Rename speakers or export the transcript.`
+    : 'Done. Export the transcript below.';
+  setStatus(sentences(done, warning), { tone: warning ? 'warning' : 'info' });
+}
+
+/**
+ * "<prefix>: <error>", unless the worker's message (already a full sentence)
+ * starts with the same words.
+ */
+function failureText(prefix, error) {
+  const message = messageOf(error);
+  return message.toLowerCase().startsWith(prefix.toLowerCase()) ? message : `${prefix}: ${message}`;
 }
 
 // ---- Transcription and diarization ----
@@ -452,8 +469,8 @@ async function transcribe(candidate) {
     setRetry({ label: 'Retry transcription', kind: 'transcribe', run: () => transcribe(candidate) });
     finishTask();
     setStatus(sentences(
-      `Transcription failed: ${messageOf(error)}`,
-      'Check your internet connection if the models have not downloaded yet, then click “Retry transcription”',
+      failureText('Transcription failed', error),
+      'Click “Retry transcription” to try again',
       keptNote(),
     ), { tone: 'error' });
     return;
@@ -474,15 +491,13 @@ async function transcribe(candidate) {
   finishTask();
   if (speakerDetectionFailed) {
     setStatus(sentences(
-      `Transcribed, but speaker detection failed: ${result.warning || 'no speaker data was returned'}`,
-      'The transcript is shown without speaker names. Click “Retry speaker detection” to try again',
+      result.warning || 'Speaker detection returned no speaker data. The transcript is shown without speaker names',
+      'Click “Retry speaker detection” to try again',
     ), { tone: 'warning' });
   } else if (!state.segments.length) {
     setStatus(sentences(result.warning || 'No speech was detected', 'Try another recording or file'), { tone: 'warning' });
-  } else if (result.warning) {
-    setStatus(sentences(doneMessage(), result.warning), { tone: 'warning' });
   } else {
-    setStatus(doneMessage());
+    setDoneStatus(result.warning);
   }
 }
 
@@ -497,12 +512,13 @@ async function diarize() {
   setProgress('indeterminate');
   setStatus('Preparing speaker detection…');
 
-  const fail = (detail) => {
+  const fail = (error) => {
     setRetry({ label: 'Retry speaker detection', kind: 'diarize', run: diarize });
     finishTask();
     setStatus(sentences(
-      `Speaker detection failed: ${detail}`,
-      'The transcript is unchanged. Check your internet connection if the models have not downloaded yet, then click “Retry speaker detection”',
+      failureText('Speaker detection failed', error),
+      'The transcript is unchanged',
+      'Click “Retry speaker detection” to try again',
     ), { tone: 'error' });
   };
 
@@ -513,7 +529,7 @@ async function diarize() {
       handleProgress,
     );
   } catch (error) {
-    fail(messageOf(error));
+    fail(error);
     return;
   }
   const next = normalizeSegments(result.segments);
@@ -527,7 +543,7 @@ async function diarize() {
   state.diarized = true;
   state.speakerNames = new Map();
   finishTask();
-  setStatus(sentences(doneMessage(), result.warning), { tone: result.warning ? 'warning' : 'info' });
+  setDoneStatus(result.warning);
 }
 
 // ---- Recording ----

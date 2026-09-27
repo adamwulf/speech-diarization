@@ -66,7 +66,7 @@ or HTTPS. Transcribing a file works on any origin.
 
 | Model | Purpose | Download |
 | --- | --- | --- |
-| Whisper tiny.en (timestamped, q8) | Speech-to-text | ~41 MB |
+| Whisper tiny.en (timestamped, q8) | Speech-to-text | ~44 MB |
 | pyannote segmentation-3.0, WeSpeaker ResNet34 embeddings, community-1 PLDA | Speaker diarization | ~34 MB |
 
 Nothing downloads when the page opens. The Whisper model downloads on the
