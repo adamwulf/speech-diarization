@@ -1,5 +1,6 @@
-// Main-thread audio: decoding any browser-supported audio to 16 kHz mono PCM,
-// microphone capture with MediaRecorder, and the native-canvas level meter.
+// Main-thread audio: decoding any browser-supported audio (or the audio track of
+// a video) to 16 kHz mono PCM, microphone capture with MediaRecorder, and the
+// native-canvas level meter.
 
 export const TARGET_SAMPLE_RATE = 16000;
 
@@ -15,8 +16,12 @@ export class UserFacingError extends Error {
  * Decodes a recording or file and returns 16 kHz mono PCM (Float32Array).
  * Decoding in an OfflineAudioContext resamples to 16 kHz; rendering through a
  * 1-channel context then down-mixes with the standard Web Audio rules.
+ * decodeAudioData can also read the audio track of some video files (for
+ * example, MP4 in Chrome). If it rejects an MP4, M4A, or MOV file (as it can
+ * for a long video), the audio track is decoded directly instead; only that
+ * path reports `onProgress(fraction)`.
  */
-export async function decodeToMono16k(blob) {
+export async function decodeToMono16k(blob, { onProgress } = {}) {
   if (typeof OfflineAudioContext === 'undefined') {
     throw new UserFacingError('This browser cannot decode audio (Web Audio is unavailable). Use a current version of Chrome, Edge, Firefox, or Safari.');
   }
@@ -34,7 +39,9 @@ export async function decodeToMono16k(blob) {
   try {
     decoded = await new OfflineAudioContext(1, 1, TARGET_SAMPLE_RATE).decodeAudioData(data);
   } catch (cause) {
-    throw new UserFacingError('This audio could not be decoded. Try a common format such as WAV, MP3, M4A, or WebM.', { cause });
+    const audio = await decodeMp4Fallback(blob, onProgress);
+    if (audio) return audio;
+    throw new UserFacingError('This file could not be decoded. Try a common format such as WAV, MP3, M4A, WebM, or MP4. A video file must have an audio track.', { cause });
   }
 
   const length = Math.round(decoded.duration * TARGET_SAMPLE_RATE);
@@ -48,6 +55,42 @@ export async function decodeToMono16k(blob) {
   source.start();
   const rendered = await offline.startRendering();
   return rendered.getChannelData(0);
+}
+
+/**
+ * The second attempt for a file that decodeAudioData rejected: decodes the
+ * audio track of an MP4, M4A, or MOV file directly (see mp4-audio.js, which
+ * loads only when needed). Resolves to null when the file isn't one, so the
+ * caller reports the first failure.
+ */
+async function decodeMp4Fallback(blob, onProgress) {
+  let mp4;
+  let movie;
+  try {
+    mp4 = await import('./mp4-audio.js');
+    movie = await mp4.readMp4AudioTrack(blob);
+  } catch {
+    return null;
+  }
+  if (!movie) return null;
+  if (!movie.audio) {
+    throw new UserFacingError('This file has no audio track, so there is nothing to transcribe.');
+  }
+
+  let audio;
+  try {
+    audio = await mp4.decodeMp4AudioTrack(blob, movie.audio, TARGET_SAMPLE_RATE, { onProgress });
+  } catch (cause) {
+    const detail = cause?.message ? ` (${cause.message})` : '';
+    throw new UserFacingError(`The audio track could not be decoded${detail}. Try converting the file to MP3 or WAV.`, { cause });
+  }
+  if (!audio) {
+    throw new UserFacingError(`This browser can’t decode the audio in this file (${movie.audio.codec}). Try a current version of Chrome or Edge, or convert the file to MP3 or WAV.`);
+  }
+  if (!audio.length) {
+    throw new UserFacingError('The audio is empty. Record again or choose a different file.');
+  }
+  return audio;
 }
 
 function microphoneErrorMessage(error) {

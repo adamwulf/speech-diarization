@@ -1,7 +1,7 @@
 # Speech Recognition & Diarization
 
 A browser demo that transcribes speech and labels who spoke when — entirely on
-your device. Record from the microphone or pick an audio file; Whisper (tiny.en,
+your device. Record from the microphone or pick an audio or video file; Whisper (tiny.en,
 base.en, or small.en) transcribes it, and optional speaker detection (pyannote + WeSpeaker via
 diarization-js) adds speaker labels. Rename speakers, then export the transcript
 as Markdown or WebVTT. Audio is never uploaded; only model files are downloaded.
@@ -35,7 +35,12 @@ or HTTPS. Transcribing a file works on any origin.
 
 - **Start recording**, speak, then **Stop recording** to transcribe.
   **Transcribe file…** accepts any audio format the browser can decode
-  (WAV, MP3, M4A, WebM, and so on).
+  (WAV, MP3, M4A, WebM, and so on), and video files (such as MP4) that have an
+  audio track. If the browser cannot decode an MP4, M4A, or MOV file directly
+  (this can occur with a long video, such as a Zoom recording), the page reads
+  only the file's audio track and decodes it with WebCodecs. This needs a
+  browser whose WebCodecs can decode the track's codec (tested with AAC in
+  Chrome).
 - **Each new recording or file replaces** the current audio, transcript, and
   speaker names. If the new audio fails to decode or transcribe, the previous
   transcript stays on screen.
@@ -114,6 +119,13 @@ storage is low.)
 - `src/audio.js`: microphone capture (`MediaRecorder`, with every track and
   audio context released on stop, error, or page hide), decoding to 16 kHz mono
   PCM with `OfflineAudioContext`, and the native canvas level meter.
+- `src/mp4-audio.js`: the second attempt for an MP4, M4A, or MOV file that
+  `decodeAudioData` rejects. [mp4box.js](https://github.com/gpac/mp4box.js)
+  reads the sample tables, then only the audio track's bytes are read and
+  decoded with WebCodecs `AudioDecoder`. Thus a long video is never held in
+  memory as a whole. Tested in `tests/mp4-audio.test.js`.
+- `src/resample.js`: a streaming windowed-sinc resampler that converts the
+  decoded audio to 16 kHz as it arrives. Tested in `tests/resample.test.js`.
 - `src/exports.js`: pure functions for turn grouping, speaker names, and
   Markdown and WebVTT output. These are tested in `tests/exports.test.js`.
 - `src/inference-worker.js`: a Web Worker that owns all model downloads and
@@ -166,3 +178,6 @@ WEBVTT
     [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
   - community-1 PLDA parameters: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - Inference runs with ONNX Runtime Web (WASM).
+- [mp4box.js](https://github.com/gpac/mp4box.js) by GPAC (BSD-3-Clause) reads
+  the audio track of MP4, M4A, and MOV files when the browser cannot decode
+  them directly.

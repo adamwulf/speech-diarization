@@ -42,6 +42,20 @@ export function diarizationFraction(progress) {
   return base + share * fraction;
 }
 
+/** Whisper windowing for long audio: 30 s windows that overlap 5 s on each side. */
+export const ASR_CHUNK_OPTIONS = Object.freeze({ chunk_length_s: 30, stride_length_s: 5 });
+
+/**
+ * The number of windows that Transformers.js transcribes for `sampleCount`
+ * samples with ASR_CHUNK_OPTIONS: one every 20 s, until a window reaches the
+ * end. ASR progress is the fraction of these windows that are done.
+ */
+export function asrWindowCount(sampleCount) {
+  const window = ASR_CHUNK_OPTIONS.chunk_length_s * SAMPLE_RATE;
+  const jump = window - 2 * ASR_CHUNK_OPTIONS.stride_length_s * SAMPLE_RATE;
+  return sampleCount <= window ? 1 : 1 + Math.ceil((sampleCount - window) / jump);
+}
+
 function assertAudio(audio) {
   if (!(audio instanceof Float32Array)) {
     throw new Error('The audio must be 16 kHz mono PCM in a Float32Array.');

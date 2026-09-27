@@ -3,7 +3,7 @@
 ## Success criteria
 
 - Match the speech-ai-demo recognition page colors, typography, panels, buttons, mic meter, and model progress UI; no TTS.
-- Record microphone audio or select a browser-decodable audio file, and transcribe in a Web Worker with the selected Whisper model (tiny.en by default, base.en, or small.en).
+- Record microphone audio or select a browser-decodable audio or video file, and transcribe in a Web Worker with the selected Whisper model (tiny.en by default, base.en, or small.en).
 - Optional diarization entirely in the browser, including consistent speaker identities across model windows.
 - Checkbox disables speaker detection for new work and hides speaker labels in existing results and exports; re-enabling on a transcript without speaker data runs diarization on retained audio.
 - Rename detected speakers, reflected in every matching transcript turn and both exports.
@@ -13,7 +13,7 @@
 
 ## Shared module contract
 
-Use vanilla JavaScript modules with Vite. Main thread owns microphone/file decoding to mono 16 kHz PCM and audio playback. Worker owns all model downloads/inference. One active task at a time.
+Use vanilla JavaScript modules with Vite. Main thread owns microphone/file decoding to mono 16 kHz PCM and audio playback. File decoding tries `decodeAudioData` first; if that fails on an MP4/M4A/MOV file (for example a long video), `src/mp4-audio.js` reads only the audio track with mp4box.js, decodes it with WebCodecs `AudioDecoder`, and resamples it as it streams (`src/resample.js`). Worker owns all model downloads/inference. One active task at a time.
 
 `src/inference-worker.js` incoming messages:
 

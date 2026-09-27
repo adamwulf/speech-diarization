@@ -38,8 +38,14 @@ Create the worker with
 - A `transcribe` request with `speakers: true` returns the transcript with
   `diarized: false` and a warning if diarization fails.
   A `diarize` request that fails sends `{type: 'error'}`; the UI keeps its transcript.
-- Progress: `asr-load`, `diarization-load`, and `diarization` send `progress` 0..1.
-  `asr` has no `progress` (indeterminate).
+- Progress: `asr-load`, `asr`, `diarization-load`, and `diarization` send `progress`
+  0..1 (a few messages, such as "Preparing the speaker detection models", have none). For `asr` it is the fraction of
+  30 s windows that are done (see `asrWindowCount`), counted with a `streamer`
+  whose `end()` Transformers.js calls once per window. Until the streamer's
+  first `put()`, `asr` reports "Preparing transcription" with no `progress`.
+  That covers computing the audio features for all windows and running the
+  first window's encoder; the first `put()` passes the prompt tokens, just
+  before the first window's decoding starts.
 - Model loads are kept for the life of the worker. A failed load is tried again on the
   next request. The worker keeps one Whisper model: when a request selects a different
   one, the worker disposes the old model, then loads the new one. Dispose frees memory
@@ -80,7 +86,8 @@ Create the worker with
   Do not pass `language` or `task`: Transformers.js 3.8.1 throws for English-only models.
 - The browser checks below used only `tiny.en`. `base.en` and `small.en` use the same
   code path, but they were not run in a browser.
-- The ASR call is `{return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5}`.
+- The ASR call is `{return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5}`
+  (`ASR_CHUNK_OPTIONS`), plus the progress `streamer`.
   Without `chunk_length_s`, audio after 30 s is lost.
 - diarization-js is a port of `pyannote/speaker-diarization-community-1`:
   10 s window segmentation, WeSpeaker ResNet34 embeddings, then AHC and VBx clustering

@@ -474,7 +474,7 @@ function renderTranscript() {
   transcriptEmpty.hidden = hasTurns;
   transcriptEmpty.textContent = state.source
     ? 'No speech was detected in this audio.'
-    : 'No transcript yet. Record or choose an audio file to get started.';
+    : 'No transcript yet. Record or choose an audio or video file to get started.';
 }
 
 function render() {
@@ -565,7 +565,12 @@ async function processSource({ blob, kind, name }) {
 
   let audio;
   try {
-    audio = await decodeToMono16k(blob);
+    audio = await decodeToMono16k(blob, {
+      onProgress: (fraction) => {
+        setProgress(fraction);
+        setStatus('Decoding audio…', { value: `${Math.round(fraction * 100)}%` });
+      },
+    });
   } catch (error) {
     const detail = error instanceof UserFacingError ? error.message : `The audio could not be decoded: ${messageOf(error)}`;
     finishTask();
@@ -778,7 +783,7 @@ clearBtn.addEventListener('click', () => {
   state.speakerNames = new Map();
   setRetry(null);
   render();
-  setStatus('Cleared. Click “Start recording”, or transcribe an audio file.');
+  setStatus('Cleared. Click “Start recording”, or transcribe an audio or video file.');
 });
 
 retryBtn.addEventListener('click', () => {
