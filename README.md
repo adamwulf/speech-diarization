@@ -1,8 +1,8 @@
 # Speech Recognition & Diarization
 
 A browser demo that transcribes speech and labels who spoke when — entirely on
-your device. Record from the microphone or pick an audio file; Whisper tiny.en
-transcribes it, and optional speaker detection (pyannote + WeSpeaker via
+your device. Record from the microphone or pick an audio file; Whisper (tiny.en,
+base.en, or small.en) transcribes it, and optional speaker detection (pyannote + WeSpeaker via
 diarization-js) adds speaker labels. Rename speakers, then export the transcript
 as Markdown or WebVTT. Audio is never uploaded; only model files are downloaded.
 
@@ -50,6 +50,11 @@ or HTTPS. Transcribing a file works on any origin.
     older transcript.
   - If speaker detection runs but cannot identify any speaker, the page says
     so and shows the transcript without speaker names.
+- **Speech recognition model**: Fast (Whisper tiny.en, the default), Balanced
+  (base.en), or Accurate (small.en). A larger model makes fewer mistakes, but
+  it downloads more data and transcribes more slowly. The choice applies to the
+  next transcription (a new recording or file, or **Retry transcription**). It
+  does not transcribe the current audio again.
 - **Speakers** get default names (“Speaker 1”, “Speaker 2”, …) in order of
   first appearance. Type a new name to update every matching turn and both
   exports. Clear the field to use the default name again. Segments that could
@@ -66,11 +71,18 @@ or HTTPS. Transcribing a file works on any origin.
 
 | Model | Purpose | Download |
 | --- | --- | --- |
-| Whisper tiny.en (timestamped, q8) | Speech-to-text | ~44 MB |
+| Whisper tiny.en (timestamped, q8), the default | Speech-to-text, Fast | ~44 MB |
+| Whisper base.en (timestamped, q8) | Speech-to-text, Balanced | ~80 MB |
+| Whisper small.en (timestamped, q8) | Speech-to-text, Accurate | ~252 MB |
 | pyannote segmentation-3.0, WeSpeaker ResNet34 embeddings, community-1 PLDA | Speaker diarization | ~34 MB |
 
-Nothing downloads when the page opens. The Whisper model downloads on the
-first transcription; the speaker models download the first time speaker
+Word error rate, averaged over the 14 English test sets in the Whisper paper
+([Table 8](https://arxiv.org/pdf/2212.04356), greedy decoding): tiny.en 20.1%,
+base.en 16.9%, small.en 13.7%. The paper used full-precision models, so the
+q8 models here can be a little less accurate.
+
+Nothing downloads when the page opens. The selected Whisper model downloads on
+its first transcription; the speaker models download the first time speaker
 detection runs. After that, the browser cache supplies them.
 
 ## How it works
@@ -78,6 +90,8 @@ detection runs. After that, the browser cache supplies them.
 - `src/main.js`: page state and controls, the worker client, and
   transcript rendering. It builds all DOM with `textContent`, never HTML
   strings, so transcript text and speaker names cannot inject markup.
+- `src/asr-models.js`: the Whisper models that you can select, with their
+  pinned revisions and download sizes. The page and the worker both use it.
 - `src/audio.js`: microphone capture (`MediaRecorder`, with every track and
   audio context released on stop, error, or page hide), decoding to 16 kHz mono
   PCM with `OfflineAudioContext`, and the native canvas level meter.
@@ -117,8 +131,10 @@ WEBVTT
 ## Credits and licenses
 
 - [Whisper](https://github.com/openai/whisper) by OpenAI, via the
-  [onnx-community/whisper-tiny.en_timestamped](https://huggingface.co/onnx-community/whisper-tiny.en_timestamped)
-  conversion and [Transformers.js](https://github.com/huggingface/transformers.js).
+  [onnx-community/whisper-tiny.en_timestamped](https://huggingface.co/onnx-community/whisper-tiny.en_timestamped),
+  [onnx-community/whisper-base.en_timestamped](https://huggingface.co/onnx-community/whisper-base.en_timestamped), and
+  [onnx-community/whisper-small.en_timestamped](https://huggingface.co/onnx-community/whisper-small.en_timestamped)
+  conversions and [Transformers.js](https://github.com/huggingface/transformers.js).
 - [diarization-js](https://github.com/briox/diarization-js), a port of
   [pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1)
   by the [pyannote.audio](https://github.com/pyannote/pyannote-audio) team.

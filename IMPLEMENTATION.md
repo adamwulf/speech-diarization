@@ -17,7 +17,7 @@ Use vanilla JavaScript modules with Vite. Main thread owns microphone/file decod
 
 `src/inference-worker.js` incoming messages:
 
-- `{type: 'transcribe', id, audio: Float32Array, speakers: boolean}`
+- `{type: 'transcribe', id, audio: Float32Array, speakers: boolean, asrModel?: 'tiny.en'|'base.en'|'small.en'}` (default `tiny.en`)
 - `{type: 'diarize', id, audio: Float32Array, segments: TranscriptSegment[]}` for an existing transcript
 
 Outgoing:

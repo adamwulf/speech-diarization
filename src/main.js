@@ -2,6 +2,7 @@
 // keeps it for re-diarization, and hands copies to the inference worker, which
 // owns every model download and inference (see IMPLEMENTATION.md for the protocol).
 
+import { ASR_MODELS, DEFAULT_ASR_MODEL, downloadSize, getAsrModel } from './asr-models.js';
 import { LevelMeter, TARGET_SAMPLE_RATE, UserFacingError, decodeToMono16k, startMicrophone } from './audio.js';
 import {
   EXPORT_FORMATS,
@@ -25,6 +26,7 @@ const fileBtn = $('fileBtn');
 const fileInput = $('fileInput');
 const clearBtn = $('clearBtn');
 const speakersToggle = $('speakersToggle');
+const asrModelSelect = $('asrModelSelect');
 const asrModel = $('asrModel');
 const diarModel = $('diarModel');
 const track = $('track');
@@ -243,6 +245,11 @@ function setProgress(value) {
   }
 }
 
+function renderAsrModel() {
+  const model = getAsrModel(asrModelSelect.value);
+  asrModel.textContent = `${model.label} · speech-to-text · ${downloadSize(model.bytes)} · runs locally`;
+}
+
 function setActiveModel(stage) {
   asrModel.classList.toggle('active', stage === 'asr-load' || stage === 'asr');
   diarModel.classList.toggle('active', stage === 'diarization-load' || stage === 'diarization');
@@ -274,6 +281,7 @@ function updateControls() {
   fileBtn.disabled = !idle;
   clearBtn.disabled = !idle || (!state.source && !state.retry);
   speakersToggle.disabled = !idle;
+  asrModelSelect.disabled = !idle;
   // Hiding or disabling the focused Retry button would drop keyboard focus to
   // the page; park it on the status line, which announces what happens next.
   if (retryRow.contains(document.activeElement) && (!state.retry || !idle)) statusEl.focus();
@@ -456,6 +464,7 @@ async function processSource({ blob, kind, name }) {
 
 async function transcribe(candidate) {
   const speakers = speakersToggle.checked;
+  const model = asrModelSelect.value;
   state.phase = 'busy';
   setRetry(null);
   updateControls();
@@ -464,7 +473,10 @@ async function transcribe(candidate) {
 
   let result;
   try {
-    result = await inference.run({ type: 'transcribe', audio: candidate.audio, speakers }, handleProgress);
+    result = await inference.run(
+      { type: 'transcribe', audio: candidate.audio, speakers, asrModel: model },
+      handleProgress,
+    );
   } catch (error) {
     setRetry({ label: 'Retry transcription', kind: 'transcribe', run: () => transcribe(candidate) });
     finishTask();
@@ -698,6 +710,8 @@ speakersToggle.addEventListener('change', () => {
   }
 });
 
+asrModelSelect.addEventListener('change', renderAsrModel);
+
 exportMdBtn.addEventListener('click', () => download('markdown'));
 exportVttBtn.addEventListener('click', () => download('webvtt'));
 
@@ -713,11 +727,18 @@ window.addEventListener('pagehide', () => {
 });
 
 // ---- Startup ----
+for (const [key, model] of Object.entries(ASR_MODELS)) {
+  asrModelSelect.add(new Option(`${model.level} — ${model.label} (${downloadSize(model.bytes)})`, key));
+}
+asrModelSelect.value = DEFAULT_ASR_MODEL;
+renderAsrModel();
+
 if (typeof Worker === 'undefined' || typeof OfflineAudioContext === 'undefined') {
   render();
   micBtn.disabled = true;
   fileBtn.disabled = true;
   speakersToggle.disabled = true;
+  asrModelSelect.disabled = true;
   setStatus('This browser is missing Web Workers or Web Audio, which this demo needs. Use a current version of Chrome, Edge, Firefox, or Safari.', { tone: 'error' });
 } else {
   render();

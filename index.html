@@ -49,6 +49,14 @@
           speakers in the current audio if needed.
         </p>
 
+        <label for="asrModelSelect" class="section-label mt">Speech recognition model</label>
+        <!-- Options come from src/asr-models.js. -->
+        <select id="asrModelSelect" aria-describedby="asrModelHelp"></select>
+        <p class="helper" id="asrModelHelp">
+          Larger models make fewer mistakes, but they download more data and transcribe
+          more slowly. The model is used for the next transcription.
+        </p>
+
         <h3 class="section-label mt">Models</h3>
         <div class="model-line" id="asrModel">Whisper tiny.en · speech-to-text · ~44 MB · runs locally</div>
         <div class="model-line" id="diarModel">pyannote + WeSpeaker · speaker diarization · ~34 MB · runs locally</div>
@@ -95,7 +103,10 @@
     </main>
 
     <p class="footnote repo-link">
-      Speech-to-text with <a href="https://huggingface.co/onnx-community/whisper-tiny.en_timestamped" target="_blank" rel="noopener">Whisper tiny.en</a>
+      Speech-to-text with Whisper
+      <a href="https://huggingface.co/onnx-community/whisper-tiny.en_timestamped" target="_blank" rel="noopener">tiny.en</a>,
+      <a href="https://huggingface.co/onnx-community/whisper-base.en_timestamped" target="_blank" rel="noopener">base.en</a>, or
+      <a href="https://huggingface.co/onnx-community/whisper-small.en_timestamped" target="_blank" rel="noopener">small.en</a>
       via <a href="https://github.com/huggingface/transformers.js" target="_blank" rel="noopener">Transformers.js</a>.
       Speaker diarization with <a href="https://github.com/briox/diarization-js" target="_blank" rel="noopener">diarization-js</a>,
       a port of <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noopener">pyannote speaker-diarization-community-1</a>

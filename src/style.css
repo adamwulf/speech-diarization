@@ -110,6 +110,20 @@ input[type="text"] {
 input[type="text"]::placeholder { color: var(--muted); opacity: 1; }
 input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+/* Speech recognition model picker (reference select styling). */
+select {
+  width: 100%;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 18px;
+  font-family: inherit;
+}
+select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+select:disabled { opacity: 0.45; cursor: not-allowed; }
+
 /* Added: speaker-detection checkbox row. */
 .check { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
 .check input {
