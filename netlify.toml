@@ -1,0 +1,12 @@
+[build]
+  # A local `netlify deploy` builds with whatever node_modules exists, so
+  # install first to keep deploys from depending on a manual step.
+  command = "npm install && npm run build"
+  publish = "dist"
+
+[build.environment]
+  # sharp (a dependency of @huggingface/transformers) tries to compile from
+  # source when it finds a global libvips, such as Homebrew's, and that
+  # compile fails. Tell it to install its prebuilt binary instead; the
+  # browser build never loads sharp anyway.
+  SHARP_IGNORE_GLOBAL_LIBVIPS = "1"
