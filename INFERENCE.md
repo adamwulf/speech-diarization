@@ -128,5 +128,44 @@ Results, the same in both builds:
 
 The harness and fixtures are in `/private/tmp/speech-inference-smoke/` (not committed).
 
+### Long audio: ASR chunk stitching
+
+No natural 60 to 90 s recording with more than one speaker was available, so two inputs
+were used (production build, same conditions as above, engine commit `746607f`):
+
+- A: `ted_60_16k.wav` from the Transformers.js docs dataset: natural speech, 60.0 s,
+  one speaker.
+- B: a concatenation of pyannote `sample.wav` (0 to 30 s, two speakers) and
+  `ted_60_16k.wav` (30 to 90 s), 90.0 s. The concatenation point is at 30 s.
+
+With `chunk_length_s: 30, stride_length_s: 5`, the ASR windows start every 20 s, so the
+stitch regions are 20 to 30 s and 40 to 50 s (A), and 20 to 30, 40 to 50, and 60 to 70 s (B).
+All stitch regions are in natural speech.
+
+Checks and results:
+
+| Check | A (60 s) | B (90 s) |
+|---|---|---|
+| Last word | " up" ends at 60.00 s | " up," ends at 90.00 s |
+| Words | 187 | 267 |
+| Each word: finite, `0 <= start < end <= duration`; starts never decrease; segment text = words concatenated and trimmed | no problems | no problems |
+| Same 3-word group repeated at once | none | only "hello hello ..." at 0 to 9 s, which is in the audio and also in the unstitched 30 s run of `sample.wav` |
+| Stitched words vs a baseline clip of 20 s (one ASR window, no stitching) around each stitch region | 40-50 s: equal. 20-30 s: 4 word differences (civil/sivil, wanna/want to, one "and"), no word lost or repeated at the seam | 40-50 s: equal. 60-70 s: one extra "then" (see below). 20-30 s: the baseline clip is not usable (Whisper skipped the phone speech in it) |
+| Speakers | `SPEAKER_1` for all words except 2 null ("you know," at 13 s, no speaker turn nearby) | 3 speakers: `SPEAKER_1` and `SPEAKER_2` in 0 to 30 s; `SPEAKER_3` for all 188 words from 30 to 90 s (in every 10 s window) |
+
+Seam diagnosis for B: each 30 s ASR window of B was also transcribed alone (no stitching).
+
+- 60 to 70 s: the stitched words are the same as in the 40 to 70 s window alone, including
+  "but then then" at 60.14 s and "I would, I would" at 57.7 s. The 60 to 90 s window
+  alone has "But then that's". So Whisper made the extra words in the context of that
+  window; the stitching did not add them.
+- 20 to 30 s: the stitched words are the words of the 20 to 50 s window ("So I'm like,
+  oh, I don't hear ..."). The 0 to 30 s window alone has "So I don't hear ...". The stitch
+  removed the partial "So" at 20.00 s, which starts the 20 to 50 s window.
+
+Conclusion: in these runs, no word is lost at a seam and no word is repeated by the
+stitch. The words near a seam can be different from the words in a single-window run,
+because Whisper output depends on the window context.
+
 Known limit: after long silence, Whisper can put the first word's start too early
 (for example 0.0 s when speech starts at 6.7 s). The timestamps stay valid.
