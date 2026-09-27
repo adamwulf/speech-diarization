@@ -10,6 +10,7 @@ import {
   createByteProgress,
   createModelSlot,
   diarizationFraction,
+  enqueueRequest,
   readResponseBytes,
   runDiarize,
   runTranscribe,
@@ -154,11 +155,22 @@ function loadDiarizer(report) {
   return diarizerPromise;
 }
 
-/** Handle a `preload` request: load one model now, so a later task does not wait for it. */
+/**
+ * Handle a `preload` request: load one model now, so a later task does not wait
+ * for it. `ready` is sent here too, because a model that is already loaded sends
+ * no model messages of its own.
+ */
 async function preload(message, report) {
-  if (message.model === 'asr') await loadAsr(message.asrModel, report);
-  else if (message.model === 'diarization') await loadDiarizer(report);
-  else throw new Error(`Unknown model to preload: ${message.model}`);
+  if (message.model === 'asr') {
+    const key = message.asrModel ?? DEFAULT_ASR_MODEL;
+    await loadAsr(key, report);
+    postModelState('asr', key, 'ready');
+  } else if (message.model === 'diarization') {
+    await loadDiarizer(report);
+    postModelState('diarization', null, 'ready');
+  } else {
+    throw new Error(`Unknown model to preload: ${message.model}`);
+  }
   return {};
 }
 
@@ -215,8 +227,7 @@ async function handle(message) {
 }
 
 // One request at a time, preloads included, so the Whisper slot never switches
-// models mid-task. A task goes before the preloads that have not started, so
-// it does not wait for a model that it might not use.
+// models mid-task. `enqueueRequest` sets the order of the waiting requests.
 const waiting = [];
 let running = false;
 
@@ -230,9 +241,8 @@ async function drain() {
 }
 
 self.addEventListener('message', (event) => {
-  const message = event.data;
-  const firstPreload = waiting.findIndex((queued) => queued?.type === 'preload');
-  if (message?.type === 'preload' || firstPreload === -1) waiting.push(message);
-  else waiting.splice(firstPreload, 0, message);
+  const replaced = enqueueRequest(waiting, event.data);
+  // A newer preload of the same model took its place before it started.
+  if (replaced) self.postMessage({ type: 'result', id: replaced.id });
   if (!running) drain();
 });

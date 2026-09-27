@@ -53,7 +53,7 @@ or HTTPS. Transcribing a file works on any origin.
 - **Speech recognition model**: Fast (Whisper tiny.en, the default), Balanced
   (base.en), or Accurate (small.en). A larger model makes fewer mistakes, but
   it downloads more data and transcribes more slowly. The selected model starts
-  to download at once. The choice applies to the next transcription (a new
+  to load in the background. The choice applies to the next transcription (a new
   recording or file, or **Retry transcription**). It does not transcribe the
   current audio again.
 - **Speakers** get default names (“Speaker 1”, “Speaker 2”, …) in order of
@@ -63,7 +63,9 @@ or HTTPS. Transcribing a file works on any origin.
 - **Export Markdown** and **Export WebVTT** download the transcript as shown,
   including the current speaker names (or no names, if they are hidden).
 - **Errors** tell you what to do next. Model download or inference failures
-  show a **Retry transcription** or **Retry speaker detection** button.
+  during a task show a **Retry transcription** or **Retry speaker detection**
+  button. A failed background load shows “could not load” on its model line,
+  with no button; the next task that needs the model tries to load it again.
   Microphone and decoding errors tell you how to fix the problem.
 - Buttons that would start other work are disabled while a task runs. Only one
   task runs at a time.
@@ -83,15 +85,24 @@ base.en 16.9%, small.en 13.7%. The paper used full-precision models, so the
 q8 models here can be a little less accurate.
 
 When the page opens, the selected Whisper model and the speaker models start
-to download in the background. When you select a different Whisper model, it
-starts to download at once. Each model line shows the state of its model
-(waiting, downloading with a percentage, ready, or could not load). You can
-record while the models download; a transcription that starts before its
-models are ready waits for them and shows their download progress. After the
-first download, the browser cache supplies the models. Only one Whisper model
-is kept in memory, but the page never removes a downloaded model from the
-browser cache, so selecting it again does not download it again. (The browser
-can still clear its cache, for example when storage is low.)
+to load in the background: one at a time, Whisper first. When you select a
+different Whisper model, it starts to load after it stays selected for one
+second. Each model downloads only the first time; after that, the browser
+cache supplies it. Each model line shows the state of its model (waiting to
+load, loading with a percentage, ready, or could not load). The page does not
+tell a download from a cache read, so both show as loading.
+
+You can record while the models load. A transcription or speaker detection
+waits for the model load that is running, even if it does not use that model
+(for example, the speaker models when **Detect speakers** is off, or a Whisper
+model that is no longer selected). While it waits, the status line shows that
+load's progress. It does not wait for loads that have not started; it then
+loads the models that it needs itself.
+
+Only one Whisper model is kept in memory, but the page never removes a
+downloaded model from the browser cache, so selecting it again does not
+download it again. (The browser can still clear its cache, for example when
+storage is low.)
 
 ## How it works
 

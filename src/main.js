@@ -82,8 +82,7 @@ const state = {
 let mic = null;
 // A transcribe or diarize request is waiting in the worker queue.
 let taskRunning = false;
-// The Whisper model that a preload request is loading, or null.
-let asrPreloadKey = null;
+let asrPreloadTimer = 0;
 let recordingTimer = 0;
 let recordingStartedAt = 0;
 
@@ -282,8 +281,9 @@ function setProgress(value) {
 
 function modelStateText(entry) {
   switch (entry?.state) {
-    case 'queued': return 'waiting to download';
-    case 'loading': return Number.isFinite(entry.progress) ? `downloading ${percent(entry.progress)}%` : 'preparing';
+    // "loading", not "downloading": a model in the browser cache loads the same way.
+    case 'queued': return 'waiting to load';
+    case 'loading': return Number.isFinite(entry.progress) ? `loading ${percent(entry.progress)}%` : 'preparing';
     case 'ready': return 'ready';
     case 'failed': return 'could not load, tries again when needed';
     default: return '';
@@ -517,26 +517,25 @@ function failureText(prefix, error) {
 // frees the previous one from memory, but its files stay in the browser
 // cache, so selecting it again does not download it again.
 
+// Arrow keys on a closed select can fire 'change' for each model they pass,
+// so a new selection preloads only after it stays selected this long.
+const ASR_PRELOAD_DELAY_MS = 1000;
+
 /** A task that waits behind a preload shows the preload's progress. */
 function showPreloadProgress(message) {
   if (taskRunning) handleProgress(message);
 }
 
-function preloadAsr() {
-  const key = asrModelSelect.value;
-  if (asrPreloadKey === key) return;
-  state.models.asr.set(key, { state: 'queued' });
+function queueAsrModelState() {
+  state.models.asr.set(asrModelSelect.value, { state: 'queued' });
   renderModelLines();
-  // One Whisper preload at a time. When it ends, the model selected then
-  // loads, so moving through the list does not download every model.
-  if (asrPreloadKey) return;
-  asrPreloadKey = key;
-  inference.run({ type: 'preload', model: 'asr', asrModel: key }, showPreloadProgress)
-    .catch(() => {}) // The model line shows the failure; the next transcription tries again.
-    .finally(() => {
-      asrPreloadKey = null;
-      if (asrModelSelect.value !== key) preloadAsr();
-    });
+}
+
+function preloadAsr() {
+  queueAsrModelState();
+  // The worker drops this request if a newer Whisper preload arrives before it starts.
+  inference.run({ type: 'preload', model: 'asr', asrModel: asrModelSelect.value }, showPreloadProgress)
+    .catch(() => {}); // The model line shows the failure; the next transcription tries again.
 }
 
 function preloadDiarization() {
@@ -819,8 +818,9 @@ speakersToggle.addEventListener('change', () => {
 });
 
 asrModelSelect.addEventListener('change', () => {
-  renderModelLines();
-  preloadAsr();
+  queueAsrModelState();
+  clearTimeout(asrPreloadTimer);
+  asrPreloadTimer = setTimeout(preloadAsr, ASR_PRELOAD_DELAY_MS);
 });
 
 exportMdBtn.addEventListener('click', () => download('markdown'));

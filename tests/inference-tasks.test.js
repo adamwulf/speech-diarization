@@ -4,6 +4,7 @@ import {
   createByteProgress,
   createModelSlot,
   diarizationFraction,
+  enqueueRequest,
   hasSpeechEnergy,
   readResponseBytes,
   runDiarize,
@@ -218,6 +219,35 @@ test('diarizationFraction maps pipeline steps to one increasing 0..1 value', () 
   for (let i = 1; i < steps.length; i++) assert.ok(steps[i] > steps[i - 1]);
   assert.equal(diarizationFraction({ step: 'unknown', fraction: 1 }), 0);
   assert.equal(diarizationFraction({ step: 'embedding', fraction: NaN }), 0.25);
+});
+
+const preloadAsr = (id, asrModel) => ({ type: 'preload', id, model: 'asr', asrModel });
+const preloadDiarization = (id) => ({ type: 'preload', id, model: 'diarization' });
+
+test('enqueueRequest puts tasks in order before the waiting preloads', () => {
+  const waiting = [];
+  assert.equal(enqueueRequest(waiting, preloadAsr(1, 'tiny.en')), null);
+  assert.equal(enqueueRequest(waiting, preloadDiarization(2)), null);
+  assert.equal(enqueueRequest(waiting, { type: 'transcribe', id: 3 }), null);
+  assert.equal(enqueueRequest(waiting, { type: 'diarize', id: 4 }), null);
+  assert.deepEqual(waiting.map((request) => request.id), [3, 4, 1, 2]);
+});
+
+test('enqueueRequest appends a task when no preload is waiting', () => {
+  const waiting = [{ type: 'transcribe', id: 1 }];
+  enqueueRequest(waiting, { type: 'diarize', id: 2 });
+  assert.deepEqual(waiting.map((request) => request.id), [1, 2]);
+});
+
+test('enqueueRequest replaces a waiting preload of the same model and returns it', () => {
+  const waiting = [];
+  enqueueRequest(waiting, preloadAsr(1, 'base.en'));
+  enqueueRequest(waiting, preloadDiarization(2));
+  const replaced = enqueueRequest(waiting, preloadAsr(3, 'small.en'));
+  assert.equal(replaced.id, 1);
+  assert.deepEqual(waiting.map((request) => request.id), [3, 2]);
+  assert.equal(enqueueRequest(waiting, preloadDiarization(4)).id, 2);
+  assert.deepEqual(waiting.map((request) => request.id), [3, 4]);
 });
 
 function fakeModelSlot({ failLoads = new Set(), disposeError } = {}) {

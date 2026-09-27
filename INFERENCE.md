@@ -10,7 +10,7 @@ contract, the model choices, and the runtime facts that were verified.
 |---|---|
 | `src/inference-worker.js` | Loads the models, handles `transcribe`, `diarize`, and `preload` messages, one request at a time. |
 | `src/asr-models.js` | The Whisper models that the user can select (repository, revision, download bytes). The page uses it too. |
-| `src/inference-tasks.js` | Task flow with injected model calls, silence check, progress helpers, the one-model slot for Whisper. |
+| `src/inference-tasks.js` | Task flow with injected model calls, silence check, progress helpers, the one-model slot for Whisper, the request queue order. |
 | `src/alignment.js` | Word timestamp cleanup, speaker assignment, cue grouping. |
 | `tests/inference-tasks.test.js`, `tests/alignment.test.js`, `tests/asr-models.test.js` | Node tests with fake models. |
 
@@ -46,15 +46,22 @@ Create the worker with
   only; the model files stay in the `transformers-cache` Cache API store, and nothing
   in the app deletes from it.
 - `preload` requests load a model with no audio. The page sends one for the selected
-  Whisper model and one for diarization at startup, and one for each new Whisper
-  selection (at most one Whisper preload at a time; when it ends, the page preloads the
-  model that is selected then, if it is different). Preloads go through the same queue
-  as tasks, so the Whisper slot never changes models during a task. A task waits for
-  the preload that is running, but goes before preloads that have not started, so a
-  transcription without speakers does not wait for the diarization download.
+  Whisper model and one for diarization at startup, and one for a new Whisper
+  selection after it stays selected for 1 s (arrow keys on a closed select can fire
+  `change` for each model they pass).
+- Queue order (`enqueueRequest` in `src/inference-tasks.js`): one request runs at a
+  time, preloads included, so the Whisper slot never changes models during a task.
+  A task goes after the other waiting tasks but before the waiting preloads. A task
+  still waits for the request that is running, even a preload of a model that it does
+  not use (for example the diarization download when `speakers` is false, if that
+  download started first). A preload replaces a waiting preload of the same model, and
+  the worker answers the replaced one with an empty result, so only the newest
+  selection loads.
 - Each load also sends `{type: 'model', ...}` messages (no `id`) for the model lines on
   the page: `loading` with `progress`, `loading` without `progress` while the
-  diarization sessions are created, then `ready` or `failed`.
+  diarization sessions are created, then `ready` or `failed`. A preload also sends
+  `ready` when its model was already loaded. Progress comes from the byte reads, so a
+  load from the browser cache also shows `loading` with `progress`.
 
 ## Models
 
