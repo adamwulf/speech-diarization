@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ASR_CHUNK_OPTIONS,
+  asrWindowCount,
   createByteProgress,
   createModelSlot,
   diarizationFraction,
@@ -248,6 +250,25 @@ test('enqueueRequest replaces a waiting preload of the same model and returns it
   assert.deepEqual(waiting.map((request) => request.id), [3, 2]);
   assert.equal(enqueueRequest(waiting, preloadDiarization(4)).id, 2);
   assert.deepEqual(waiting.map((request) => request.id), [3, 4]);
+});
+
+test('asrWindowCount matches the Transformers.js Whisper window loop', () => {
+  // The window loop of AutomaticSpeechRecognitionPipeline._call_whisper (3.8.1).
+  const windowsLike = (length) => {
+    const window = SAMPLE_RATE * ASR_CHUNK_OPTIONS.chunk_length_s;
+    const jump = window - 2 * SAMPLE_RATE * ASR_CHUNK_OPTIONS.stride_length_s;
+    let count = 0;
+    for (let offset = 0; ; offset += jump) {
+      count++;
+      if (offset + window >= length) return count;
+    }
+  };
+  const seconds = [0, 1, 29.99, 30, 30.01, 49.99, 50, 50.01, 70, 3600, 5400.5];
+  for (const length of seconds.map((s) => Math.round(s * SAMPLE_RATE))) {
+    assert.equal(asrWindowCount(length), windowsLike(length), `${length} samples`);
+  }
+  assert.equal(asrWindowCount(30 * SAMPLE_RATE), 1);
+  assert.equal(asrWindowCount(3600 * SAMPLE_RATE), 180);
 });
 
 function fakeModelSlot({ failLoads = new Set(), disposeError } = {}) {

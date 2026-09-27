@@ -7,6 +7,8 @@ import { DiarizationPipeline } from 'diarization-js';
 import ortWasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm?url';
 import { DEFAULT_ASR_MODEL, getAsrModel } from './asr-models.js';
 import {
+  ASR_CHUNK_OPTIONS,
+  asrWindowCount,
   createByteProgress,
   createModelSlot,
   diarizationFraction,
@@ -178,9 +180,20 @@ function createBackend(report, asrModelKey) {
   return {
     async transcribe(audio) {
       const asr = await loadAsr(asrModelKey, report);
-      report('asr', 'Transcribing');
+      report('asr', 'Transcribing', 0);
+      // Transformers.js runs generate() once per window, and each run ends the
+      // streamer, so counting end() calls counts finished windows.
+      const windows = asrWindowCount(audio.length);
+      let finished = 0;
+      const streamer = {
+        put() {},
+        end() {
+          finished += 1;
+          report('asr', 'Transcribing', Math.min(1, finished / windows));
+        },
+      };
       try {
-        const output = await asr(audio, { return_timestamps: 'word', chunk_length_s: 30, stride_length_s: 5 });
+        const output = await asr(audio, { return_timestamps: 'word', ...ASR_CHUNK_OPTIONS, streamer });
         return output.chunks ?? [];
       } catch (error) {
         throw new Error(`Transcription failed (${errorText(error)}). Try again.`);
