@@ -76,7 +76,8 @@ Create the worker with
 - `segmentationBatchSize: 8` keeps WASM memory low. `embeddingBatchSize: 1`:
   diarization-js zero-pads each embedding batch to its longest crop, and the padding
   changes the embeddings. On the two-speaker pyannote sample, batch 8 merged both
-  speakers into one. Batch 1 gave the best match to the reference and was the fastest.
+  speakers into one. In that test, batch 1 (no padding) found both speakers and was also
+  faster than the larger batches.
 - Vite prints "Module node:fs/promises has been externalized" for diarization-js
   `artifacts.js`. Those imports are only in its Node code path; the warning is harmless.
 
@@ -93,16 +94,39 @@ Create the worker with
 
 ## Browser validation
 
-Headless Chrome (`websnap`) with the Vite dev server, real models, no mocks:
+These are checks on two short fixtures. They show that the pipeline works end to end.
+They do not measure general accuracy or speed.
 
-- JFK (11 s): correct text, one speaker, valid timestamps, progress values in 0..1.
-- pyannote `sample.wav` (30 s, two speakers that alternate across windows): two speakers,
-  turns match the reference RTTM within about 0.75 s (only at the first "hello").
+Conditions: headless Chrome through `websnap` (a fresh profile for each run, so the
+first case downloads all models from Hugging Face), WASM execution provider, one thread
+(no cross-origin isolation), real models, no mocks. Two builds were tested:
+
+1. Vite dev server.
+2. Production: `vite build` with `base: './'` and `worker: { format: 'es' }`, served by
+   `vite preview`.
+
+Fixtures:
+
+- `jfk.wav` (11 s, one speaker).
+- pyannote `tutorials/assets/sample.wav` (30 s, 16 kHz, two speakers that alternate
+  across 10 s windows) with its reference RTTM (speakers `speaker90` and `speaker91`).
+
+Results, the same in both builds:
+
+- JFK: the expected sentence, one speaker, valid timestamps, all progress values in 0..1.
+- `sample.wav`: two speakers. From 9 s on, each cue has the reference speaker, and a
+  speaker keeps its ID across windows (for example `speaker90` is `SPEAKER_1` at 9 s,
+  11 s, 18 s, and 28 s). Exceptions: short words at turn edges, and the overlapping
+  "Hello" words in the first 9 s.
 - Transcribe without speakers, then `diarize` with the returned segments: the same
-  result as transcribe with speakers.
-- 3 s of zeros: "no speech" without a model run. Low noise: Whisper `[BLANK_AUDIO]` is removed.
-- `vite build` with `worker.format: 'es'` makes one local WASM asset; the worker bundle
-  has no CDN reference that is used.
+  result as transcribe with speakers (dev server).
+- 3 s of zeros: "no speech" without a model run. Low noise: Whisper `[BLANK_AUDIO]` is
+  removed, so the result is "no speech" (dev server).
+- The worker loads only the local hashed `ort-wasm-simd-threaded.jsep` WASM, with a URL
+  relative to the worker. The jsDelivr default from Transformers.js is replaced before
+  any session starts.
+
+The harness and fixtures are in `/private/tmp/speech-inference-smoke/` (not committed).
 
 Known limit: after long silence, Whisper can put the first word's start too early
 (for example 0.0 s when speech starts at 6.7 s). The timestamps stay valid.
