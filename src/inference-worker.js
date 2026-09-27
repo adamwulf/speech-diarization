@@ -180,13 +180,19 @@ function createBackend(report, asrModelKey) {
   return {
     async transcribe(audio) {
       const asr = await loadAsr(asrModelKey, report);
-      report('asr', 'Transcribing', 0);
-      // Transformers.js runs generate() once per window, and each run ends the
-      // streamer, so counting end() calls counts finished windows.
+      // Transformers.js first computes the audio features of every window (no
+      // progress), then runs generate() once per window. generate() calls the
+      // streamer's put() as it produces tokens and end() when the window is done.
+      report('asr', 'Preparing transcription');
       const windows = asrWindowCount(audio.length);
+      let started = false;
       let finished = 0;
       const streamer = {
-        put() {},
+        put() {
+          if (started) return;
+          started = true;
+          report('asr', 'Transcribing', 0);
+        },
         end() {
           finished += 1;
           report('asr', 'Transcribing', Math.min(1, finished / windows));

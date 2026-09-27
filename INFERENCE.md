@@ -41,8 +41,9 @@ Create the worker with
 - Progress: `asr-load`, `asr`, `diarization-load`, and `diarization` send `progress`
   0..1 (a few messages, such as "Preparing the speaker detection models", have none). For `asr` it is the fraction of
   30 s windows that are done (see `asrWindowCount`), counted with a `streamer`
-  whose `end()` Transformers.js calls once per window. It stays at 0 while the
-  audio features for all windows are computed, before the first window runs.
+  whose `end()` Transformers.js calls once per window. While the audio features
+  for all windows are computed, before the first window runs (the streamer's
+  first `put()`), `asr` reports "Preparing transcription" with no `progress`.
 - Model loads are kept for the life of the worker. A failed load is tried again on the
   next request. The worker keeps one Whisper model: when a request selects a different
   one, the worker disposes the old model, then loads the new one. Dispose frees memory
