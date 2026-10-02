@@ -302,28 +302,63 @@ A single `dtype: 'q4f16'` string cannot be used at all. It asks for
 cause. Transformers.js swallows the first attempt's error, so a missing file for a
 seq2seq model always surfaces under that misleading message.
 
+### Long audio and small.en on WebGPU
+
+The chunk stitching that `chunk_length_s: 30, stride_length_s: 5` needs was checked on
+WebGPU too, because it is more than one `generate()` call and the fp16 decoder could have
+moved the word timestamps at a seam. `ted_60_16k.wav` (60.0 s, one speaker, so the ASR
+windows start every 20 s and the seams are 20-30 s and 40-50 s), warm:
+
+| Provider | ASR | Diarization | Words | Last word |
+|---|---|---|---|---|
+| WASM q8 | 19959 | ~45000 | 186 | " it" ends 60.00 |
+| WebGPU fp32 + fp16 | 20207 | 9507 | 186 | " up" ends 60.00 |
+
+The same 186 words on both. On both: every word finite with `0 <= start < end <=
+duration`, starts never decreasing, no 3-word group repeated back to back, and one
+speaker plus a few nulls. Across both seams the words match except that the WebGPU run
+read two of them better ("things stay civil" for "things taste civil", "But then came my
+90-page" for "But then it came my"). Note that ASR was no faster here (20.2 s against
+20.0 s): on this fixture the GPU gain is all in diarization.
+
+`small.en` on WebGPU was run once on `sample.wav`, warm: ASR 23476 ms, diarization
+6078 ms, 80 words, and the best transcript of any run here ("I heard a beep", "Sheila in
+Texas", both of which every other model missed). Its 664 MB loaded on this iGPU without
+hitting a memory limit.
+
 ### The fallback was exercised, not just written
 
 With a fault injected into the WebGPU branch of the ASR load, the worker posted
 `asr=webgpu`, then `asr=wasm (the speech recognition model could not load on the GPU)`,
 and the transcription finished correctly on WASM. Diarization stayed on WebGPU, as
-intended. With Chrome started as `--disable-features=WebGPU,WebGPUService`,
+intended.
+
+That path also covers a GPU without `shader-f16`: Transformers.js 3.8.1 *throws*
+`The device (webgpu) does not support fp16.` for an fp16 file on such an adapter
+(`models.js`, next to `isWebGpuFp16Supported`), rather than warning and continuing. So an
+older Intel, AMD, or Android GPU transcribes on the CPU and still detects speakers on the
+GPU, with the model line saying so. With Chrome started as `--disable-features=WebGPU,WebGPUService`,
 `requestAdapter()` returns null, both pipelines report `wasm`, and the page shows the q8
 sizes (44, 80, 252 MB) and "runs locally on the CPU" on both model lines.
 
 ### Caveats
 
-- One GPU (Intel Xe-LPG) and one browser. Apple GPUs on macOS are untested, and ORT's
-  WebGPU kernels have had driver-specific numerical problems before — the fp16 encoder
-  result above is an example of how wrong a quantization choice can go while still
-  "working" — so a Mac check is worth doing before trusting these numbers there.
+- One GPU (Intel Xe-LPG) and one browser. Apple GPUs on macOS are untested. This is the
+  gap that matters most: the fallback catches a provider that *throws*, and it cannot
+  catch one that returns wrong output, which is exactly what q8 and an fp16 encoder did
+  here. Run `sample.wav` on a Mac in Safari 26 or Chrome before relying on it, and look
+  for a repeated phrase in place of the conversation. If that appears,
+  `BACKEND_VARIANTS.webgpu.dtype` in `src/asr-models.js` is the one place to change (an
+  fp32 decoder would be the safe pair, at ~154 MB for tiny.en).
 - Repeated runs drift: an identical WASM configuration measured 8130 ms and 11725 ms of
   ASR at different points, because sustained load on a laptop throttles. Treat anything
   under about 1.5x as noise; the diarization result is far above that.
-- `small.en` on WebGPU was never run. It is the same code path, and its ~664 MB download
-  is the reason to think twice before selecting it.
 - Browsers without WebGPU (Safari before 26, Firefox without WebGPU in workers) take the
   WASM path, which is what the app did everywhere before this change.
+- Transformers.js sets `ort.env.webgpu.powerPreference = 'high-performance'` when it is
+  imported, and nothing here changes it, so a laptop with both a discrete and an
+  integrated GPU uses the discrete one. `'low-power'` would pin it to the integrated GPU
+  and draw less battery, at the cost of speed on those machines.
 
 The harness is `bench/` (not committed): `bench.html` and `bench.js` time a cold and a
 warm transcribe+diarize run on a chosen provider and leave the result on `window.__bench`,
