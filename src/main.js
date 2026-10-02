@@ -2,7 +2,7 @@
 // keeps it for re-diarization, and hands copies to the inference worker, which
 // owns every model download and inference (see IMPLEMENTATION.md for the protocol).
 
-import { ASR_MODELS, DEFAULT_ASR_MODEL, downloadSize, getAsrModel } from './asr-models.js';
+import { ASR_MODELS, asrVariant, DEFAULT_ASR_MODEL, downloadSize, getAsrModel } from './asr-models.js';
 import { LevelMeter, TARGET_SAMPLE_RATE, UserFacingError, decodeToMono16k, startMicrophone } from './audio.js';
 import {
   EXPORT_FORMATS,
@@ -78,8 +78,10 @@ const state = {
   // What each model line shows: { state: 'queued'|'loading'|'ready'|'failed', progress?: 0..1 }.
   // Whisper entries are per model key, so each selection shows its own state.
   models: { asr: new Map(), diarization: null },
-  // 'webgpu' or 'wasm', once the worker has reported it; null before that.
-  backend: null,
+  // The execution provider each pipeline runs on: 'webgpu' or 'wasm' once the
+  // worker has reported it, null before that. Whisper can fall back to 'wasm'
+  // on its own, so the two are tracked separately.
+  backends: { asr: null, diarization: null },
 };
 
 let mic = null;
@@ -310,15 +312,35 @@ function renderModelState(element, entry) {
   element.dataset.state = entry?.state ?? '';
 }
 
+/**
+ * The end of a model line. Until the worker reports a provider it says only
+ * "runs locally", because that part is true on either one.
+ */
+function runsWhere(backend) {
+  if (backend === 'webgpu') return 'runs locally on the GPU';
+  if (backend === 'wasm') return 'runs locally on the CPU';
+  return 'runs locally';
+}
+
+/**
+ * The size in each option, which depends on the provider: the GPU weights are a
+ * different, larger download. Rebuilding the labels keeps the selection, so this
+ * can run when the worker reports its provider.
+ */
+function renderModelOptions() {
+  for (const option of asrModelSelect.options) {
+    const model = getAsrModel(option.value);
+    const { bytes } = asrVariant(option.value, state.backends.asr);
+    // Short text, so it fits a phone-width select; the model line shows the full name.
+    option.textContent = `${model.level} — ${option.value} (${downloadSize(bytes)})`;
+  }
+}
+
 function renderModelLines() {
   const model = getAsrModel(asrModelSelect.value);
-  asrModelInfo.textContent = `${model.label} · speech-to-text · ${downloadSize(model.bytes)} · runs locally`;
-  // The speaker models are the ones that use the GPU, so only their line says
-  // where they run. Before the worker reports a backend, it says neither.
-  const where = state.backend === 'webgpu' ? 'runs locally on the GPU'
-    : state.backend === 'wasm' ? 'runs locally on the CPU'
-      : 'runs locally';
-  diarModelInfo.textContent = `pyannote + WeSpeaker · speaker diarization · ~34 MB · ${where}`;
+  const { bytes } = asrVariant(asrModelSelect.value, state.backends.asr);
+  asrModelInfo.textContent = `${model.label} · speech-to-text · ${downloadSize(bytes)} · ${runsWhere(state.backends.asr)}`;
+  diarModelInfo.textContent = `pyannote + WeSpeaker · speaker diarization · ~34 MB · ${runsWhere(state.backends.diarization)}`;
   renderModelState(asrModelState, state.models.asr.get(asrModelSelect.value));
   renderModelState(diarModelState, state.models.diarization);
 }
@@ -346,9 +368,15 @@ function handleModelState(message) {
   renderModelLines();
 }
 
-/** The worker's one report of the provider it runs the speaker models on. */
+/**
+ * The worker's report of the provider one pipeline runs on. Whisper sends a
+ * second one if it falls back to the CPU, and the sizes in the model select
+ * change with it.
+ */
 function handleBackend(message) {
-  state.backend = message.backend;
+  if (!Object.hasOwn(state.backends, message.model)) return;
+  state.backends[message.model] = message.backend;
+  if (message.model === 'asr') renderModelOptions();
   renderModelLines();
 }
 
@@ -869,11 +897,9 @@ window.addEventListener('pagehide', () => {
 });
 
 // ---- Startup ----
-for (const [key, model] of Object.entries(ASR_MODELS)) {
-  // Short text, so it fits a phone-width select; the model line shows the full name.
-  asrModelSelect.add(new Option(`${model.level} — ${key} (${downloadSize(model.bytes)})`, key));
-}
+for (const key of Object.keys(ASR_MODELS)) asrModelSelect.add(new Option(key, key));
 asrModelSelect.value = DEFAULT_ASR_MODEL;
+renderModelOptions();
 renderModelLines();
 
 if (typeof Worker === 'undefined' || typeof OfflineAudioContext === 'undefined') {

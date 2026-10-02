@@ -77,17 +77,26 @@ or HTTPS. Transcribing a file works on any origin.
 
 ## Models
 
-| Model | Purpose | Download |
-| --- | --- | --- |
-| Whisper tiny.en (timestamped, q8), the default | Speech-to-text, Fast | ~44 MB |
-| Whisper base.en (timestamped, q8) | Speech-to-text, Balanced | ~80 MB |
-| Whisper small.en (timestamped, q8) | Speech-to-text, Accurate | ~252 MB |
-| pyannote segmentation-3.0, WeSpeaker ResNet34 embeddings, community-1 PLDA | Speaker diarization | ~34 MB |
+Whisper downloads two different sets of weights, because the graphics card and
+the processor need different ones. The page and the model select always show the
+size for the one this browser will use.
+
+| Model | Purpose | On a GPU | On the processor |
+| --- | --- | --- | --- |
+| Whisper tiny.en (timestamped), the default | Speech-to-text, Fast | ~95 MB | ~44 MB |
+| Whisper base.en (timestamped) | Speech-to-text, Balanced | ~190 MB | ~80 MB |
+| Whisper small.en (timestamped) | Speech-to-text, Accurate | ~664 MB | ~252 MB |
+| pyannote segmentation-3.0, WeSpeaker ResNet34 embeddings, community-1 PLDA | Speaker diarization | ~34 MB | ~34 MB |
+
+The GPU weights are larger because they keep a full-precision encoder: the
+half-precision encoders transcribed badly, repeating one phrase instead of the
+recording. The processor instead gets 8-bit weights, which it runs well and a
+GPU does not. The speaker models are the same files on both.
 
 Word error rate, averaged over the 14 English test sets in the Whisper paper
 ([Table 8](https://arxiv.org/pdf/2212.04356), greedy decoding): tiny.en 20.1%,
 base.en 16.9%, small.en 13.7%. The paper used full-precision models, so the
-q8 models here can be a little less accurate.
+quantized models here can be a little less accurate.
 
 When the page opens, the selected Whisper model and the speaker models start
 to load in the background: one at a time, Whisper first. When you select a
@@ -97,14 +106,14 @@ cache supplies it. Each model line shows the state of its model (waiting to
 load, loading with a percentage, ready, or could not load). The page does not
 tell a download from a cache read, so both show as loading.
 
-Speaker detection runs on the graphics card when the browser offers one, which
-is several times faster than the processor; its model line says which it is
-("runs locally on the GPU" or "runs locally on the CPU"). This needs WebGPU, so
-it works in current Chrome, Edge, and Safari 26, and falls back to the
-processor elsewhere. Speech recognition always runs on the processor: measured
-on an integrated GPU, the smallest Whisper model was no faster on the GPU, and
-the weights that run well on a GPU are a much larger download. The models
-download the same files either way.
+Both models run on the graphics card when the browser offers one, including the
+integrated graphics in a typical laptop, and that is several times faster than
+the processor. Each model line says which one it is using ("runs locally on the
+GPU" or "runs locally on the CPU"). This needs WebGPU, so it works in current
+Chrome and Edge and in Safari 26, and falls back to the processor elsewhere,
+which is what every browser did before. If the graphics card turns out not to
+be able to load or run Whisper, the page says so on the model line and
+transcribes on the processor instead; speaker detection is unaffected.
 
 You can record while the models load. A transcription or speaker detection
 waits for the model load that is running, even if it does not use that model
@@ -186,9 +195,8 @@ WEBVTT
     from the [WeSpeaker](https://github.com/wenet-e2e/wespeaker) project):
     [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
   - community-1 PLDA parameters: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-- Inference runs with ONNX Runtime Web. Speaker detection uses the WebGPU
-  execution provider when the browser offers a GPU, and WASM otherwise;
-  speech recognition always uses WASM.
+- Inference runs with ONNX Runtime Web, on its WebGPU execution provider when
+  the browser offers a GPU and on WASM otherwise.
 - [mp4box.js](https://github.com/gpac/mp4box.js) by GPAC (BSD-3-Clause) reads
   the audio track of MP4, M4A, and MOV files when the browser cannot decode
   them directly.
