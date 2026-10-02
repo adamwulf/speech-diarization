@@ -30,6 +30,7 @@ const asrModelSelect = $('asrModelSelect');
 const asrModel = $('asrModel');
 const asrModelInfo = $('asrModelInfo');
 const asrModelState = $('asrModelState');
+const diarModelInfo = $('diarModelInfo');
 const diarModel = $('diarModel');
 const diarModelState = $('diarModelState');
 const track = $('track');
@@ -77,6 +78,8 @@ const state = {
   // What each model line shows: { state: 'queued'|'loading'|'ready'|'failed', progress?: 0..1 }.
   // Whisper entries are per model key, so each selection shows its own state.
   models: { asr: new Map(), diarization: null },
+  // 'webgpu' or 'wasm', once the worker has reported it; null before that.
+  backend: null,
 };
 
 let mic = null;
@@ -95,14 +98,17 @@ class InferenceClient {
   #nextId = 1;
   #pending = new Map(); // id -> {resolve, reject, onProgress}
   #onModelState;
+  #onBackend;
   #onCrash;
 
   /**
    * `onModelState(message)` gets the worker's `{type: 'model'}` messages.
+   * `onBackend(message)` gets its one `{type: 'backend'}` message.
    * `onCrash()` runs after a crash rejects the pending requests.
    */
-  constructor({ onModelState, onCrash }) {
+  constructor({ onModelState, onBackend, onCrash }) {
     this.#onModelState = onModelState;
+    this.#onBackend = onBackend;
     this.#onCrash = onCrash;
   }
 
@@ -147,6 +153,10 @@ class InferenceClient {
       this.#onModelState(message);
       return;
     }
+    if (message?.type === 'backend') {
+      this.#onBackend(message);
+      return;
+    }
     const pending = this.#pending.get(message?.id);
     if (!pending) return;
     if (message.type === 'progress') {
@@ -171,7 +181,11 @@ class InferenceClient {
   }
 }
 
-const inference = new InferenceClient({ onModelState: handleModelState, onCrash: handleCrash });
+const inference = new InferenceClient({
+  onModelState: handleModelState,
+  onBackend: handleBackend,
+  onCrash: handleCrash,
+});
 const meter = new LevelMeter($('meter'));
 
 // ---- Small helpers ----
@@ -299,6 +313,12 @@ function renderModelState(element, entry) {
 function renderModelLines() {
   const model = getAsrModel(asrModelSelect.value);
   asrModelInfo.textContent = `${model.label} · speech-to-text · ${downloadSize(model.bytes)} · runs locally`;
+  // The speaker models are the ones that use the GPU, so only their line says
+  // where they run. Before the worker reports a backend, it says neither.
+  const where = state.backend === 'webgpu' ? 'runs locally on the GPU'
+    : state.backend === 'wasm' ? 'runs locally on the CPU'
+      : 'runs locally';
+  diarModelInfo.textContent = `pyannote + WeSpeaker · speaker diarization · ~34 MB · ${where}`;
   renderModelState(asrModelState, state.models.asr.get(asrModelSelect.value));
   renderModelState(diarModelState, state.models.diarization);
 }
@@ -323,6 +343,12 @@ function handleModelState(message) {
   const entry = { state: message.state, progress: message.progress };
   if (message.model === 'asr') state.models.asr.set(message.asrModel, entry);
   else if (message.model === 'diarization') state.models.diarization = entry;
+  renderModelLines();
+}
+
+/** The worker's one report of the provider it runs the speaker models on. */
+function handleBackend(message) {
+  state.backend = message.backend;
   renderModelLines();
 }
 

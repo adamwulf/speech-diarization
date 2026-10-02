@@ -7,6 +7,12 @@ import { DiarizationPipeline } from 'diarization-js';
 import ortWasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm?url';
 import { DEFAULT_ASR_MODEL, getAsrModel } from './asr-models.js';
 import {
+  detectBackend,
+  diarizationExecutionProviders,
+  parseBackendOverride,
+  segmentationBatchSize,
+} from './backend.js';
+import {
   ASR_CHUNK_OPTIONS,
   asrWindowCount,
   createByteProgress,
@@ -25,6 +31,17 @@ import {
 // ORT build. Use the local WASM that matches the installed onnxruntime-web.
 ort.env.wasm.wasmPaths = { wasm: ortWasmUrl };
 env.allowLocalModels = false;
+
+// Settled once, before any model loads, and reported to the page. The same
+// local WASM file carries the WebGPU provider: it is the `jsep` build, which
+// is why no extra runtime file is needed for the GPU.
+const backendPromise = detectBackend({
+  override: parseBackendOverride(self.location?.search),
+  requestAdapter: navigator.gpu ? () => navigator.gpu.requestAdapter() : null,
+}).then((choice) => {
+  self.postMessage({ type: 'backend', backend: choice.backend, reason: choice.reason });
+  return choice.backend;
+});
 
 const DIARIZATION_BASE_URL =
   'https://huggingface.co/briox/diarization-js-community-1/resolve/7f02c43a14eff6d4dea0a4f8099f1ca48eb163b8/';
@@ -69,6 +86,10 @@ const asrSlot = createModelSlot({
     const expectedBytes = Math.floor(model.bytes * 0.999);
     return pipeline('automatic-speech-recognition', model.repo, {
       revision: model.revision,
+      // WASM, not WebGPU: on an Intel Xe iGPU these q8 weights ran 18x slower
+      // on WebGPU and returned nonsense, because the integer matrix operators
+      // are not WebGPU operators. The WebGPU weights are a separate, larger
+      // download, and for tiny.en they are slower than this. See INFERENCE.md.
       device: 'wasm',
       dtype: 'q8',
       progress_callback: transformersProgressHandler(createByteProgress(expectedBytes, onFraction)),
@@ -128,14 +149,16 @@ async function createDiarizer(report) {
   );
   report('diarization-load', 'Preparing the speaker detection models');
   postModelState('diarization', null, 'loading');
+  // The same model files run on either provider, so the backend changes no
+  // download.
+  const backend = await backendPromise;
   return DiarizationPipeline.create({
     ort,
     segmentationModel,
     embeddingModel,
     pldaParamsJson: JSON.parse(new TextDecoder().decode(pldaBytes)),
-    executionProviders: ['wasm'],
-    // A smaller batch than the WebGPU-tuned default keeps WASM memory use low.
-    segmentationBatchSize: 8,
+    executionProviders: diarizationExecutionProviders(backend),
+    segmentationBatchSize: segmentationBatchSize(backend),
     // diarization-js zero-pads each embedding batch to its longest crop, and
     // the padding changes the embeddings. In browser tests on a two-speaker
     // sample, batch 8 merged both speakers into one; batch 1 (no padding) gave

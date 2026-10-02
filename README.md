@@ -97,6 +97,15 @@ cache supplies it. Each model line shows the state of its model (waiting to
 load, loading with a percentage, ready, or could not load). The page does not
 tell a download from a cache read, so both show as loading.
 
+Speaker detection runs on the graphics card when the browser offers one, which
+is several times faster than the processor; its model line says which it is
+("runs locally on the GPU" or "runs locally on the CPU"). This needs WebGPU, so
+it works in current Chrome, Edge, and Safari 26, and falls back to the
+processor elsewhere. Speech recognition always runs on the processor: measured
+on an integrated GPU, the smallest Whisper model was no faster on the GPU, and
+the weights that run well on a GPU are a much larger download. The models
+download the same files either way.
+
 You can record while the models load. A transcription or speaker detection
 waits for the model load that is running, even if it does not use that model
 (for example, the speaker models when **Detect speakers** is off, or a Whisper
@@ -177,7 +186,9 @@ WEBVTT
     from the [WeSpeaker](https://github.com/wenet-e2e/wespeaker) project):
     [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
   - community-1 PLDA parameters: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-- Inference runs with ONNX Runtime Web (WASM).
+- Inference runs with ONNX Runtime Web. Speaker detection uses the WebGPU
+  execution provider when the browser offers a GPU, and WASM otherwise;
+  speech recognition always uses WASM.
 - [mp4box.js](https://github.com/gpac/mp4box.js) by GPAC (BSD-3-Clause) reads
   the audio track of MP4, M4A, and MOV files when the browser cannot decode
   them directly.

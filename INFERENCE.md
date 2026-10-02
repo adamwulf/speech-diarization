@@ -78,7 +78,8 @@ Create the worker with
 | ASR `small.en` | `onnx-community/whisper-small.en_timestamped` at revision `80853938…` | 251.7 MB, Transformers.js browser cache |
 | Diarization | `diarization-js@0.1.0` with `briox/diarization-js-community-1` at revision `7f02c43a…` | 33.5 MB, Cache API `diarization-js-community-1` |
 
-- All ASR models load with `dtype: 'q8'` and `device: 'wasm'`. The download is
+- All ASR models load with `dtype: 'q8'` and `device: 'wasm'` (see the WebGPU
+  measurements under "ONNX Runtime" and below). The download is
   `encoder_model_quantized.onnx`, `decoder_model_merged_quantized.onnx`, and the config
   and tokenizer files. Each `_timestamped` export has `alignment_heads` in its
   `generation_config.json`.
@@ -111,13 +112,29 @@ Create the worker with
   1.22.0 glue code with the matching local WASM, and there is no CDN request for runtime
   files. The URL comes from a relative `?url` import because the `onnxruntime-web`
   exports map does not expose `dist/`.
-- Both sessions use the WASM execution provider. Without cross-origin isolation, ORT
-  uses one thread.
-- `segmentationBatchSize: 8` keeps WASM memory low. `embeddingBatchSize: 1`:
-  diarization-js zero-pads each embedding batch to its longest crop, and the padding
-  changes the embeddings. On the two-speaker pyannote sample, batch 8 merged both
-  speakers into one. In that test, batch 1 (no padding) found both speakers and was also
-  faster than the larger batches.
+- Without cross-origin isolation, the WASM provider uses one thread.
+- `src/backend.js` picks the provider once per worker, before any model loads, and the
+  worker posts it as `{type: 'backend'}`. WebGPU needs `navigator.gpu.requestAdapter()`
+  to return an adapter; a missing `navigator.gpu`, a null adapter, and a rejection all
+  fall back to WASM. The check has to come first because Transformers.js throws
+  `Unsupported device` for a WebGPU request in a browser without WebGPU.
+  `?backend=webgpu|wasm` on the worker URL forces one provider; the page never sets it,
+  so the app always detects.
+- The diarization sessions use `['webgpu', 'wasm']` on a machine with a GPU: ORT assigns
+  an operator that the WebGPU provider does not implement to WASM instead of failing the
+  session. The segmentation and embedding files are the same fp32 ONNX on both providers,
+  so the provider changes no download.
+- No extra runtime file is needed for WebGPU: the local WASM the worker already points
+  ORT at is the `jsep` build, which carries the WebGPU provider.
+- Whisper stays on the WASM provider with q8 weights. The measurements below are why:
+  the q8 weights are far slower and return nonsense on WebGPU, and the weights that do
+  run well on WebGPU are a larger download that was not faster for the default model.
+- `segmentationBatchSize` is 32 on WebGPU (the diarization-js default, which keeps the
+  GPU busy) and 8 on WASM, where a batch that large only grows the heap.
+  `embeddingBatchSize: 1` on both: diarization-js zero-pads each embedding batch to its
+  longest crop, and the padding changes the embeddings. On the two-speaker pyannote
+  sample, batch 8 merged both speakers into one. In that test, batch 1 (no padding) found
+  both speakers and was also faster than the larger batches.
 - Vite prints "Module node:fs/promises has been externalized" for diarization-js
   `artifacts.js`. Those imports are only in its Node code path; the warning is harmless.
 
@@ -209,3 +226,87 @@ because Whisper output depends on the window context.
 
 Known limit: after long silence, Whisper can put the first word's start too early
 (for example 0.0 s when speech starts at 6.7 s). The timestamps stay valid.
+
+## WebGPU: what was measured
+
+One machine, so these are not general numbers. They are the evidence for running the
+speaker models on the GPU and leaving Whisper on the CPU.
+
+Conditions: Chrome (headless) on Windows 11, Intel Xe-LPG integrated GPU (`shader-f16`
+present), no cross-origin isolation, so the WASM provider has one thread. Fixture:
+pyannote `sample.wav`, 30 s, two speakers, `speakers: true`, model `tiny.en` unless
+noted. Models were already downloaded. "warm" is the second transcription in the same
+page: the first one compiles the WebGPU shaders, which a user pays once per page, so the
+warm run is what a user sees from the second transcription on. Times are the `asr` and
+`diarization` stages in ms.
+
+### Speaker models: WebGPU is much faster and gave the same labels
+
+| Whisper on | Speakers on | ASR | Diarization | Total | Words |
+|---|---|---|---|---|---|
+| WASM q8 | WASM | 8130 | 28668 | 36803 | 76 |
+| WASM q8 | WebGPU (warm) | 8809 | 5015 | 13826 | 76 |
+
+Diarization went from 28.7 s to 5.0 s (5.7x), and the whole run from 36.8 s to 13.8 s.
+The result was identical: the same 76 words, and the same speaker on every one of them.
+On `base.en`, where diarization runs over the same audio, it went from 36.5 s to 3.0 s.
+
+### Whisper: the q8 weights must not go to WebGPU
+
+Switching only `device` to `webgpu`, keeping `dtype: 'q8'`, was 18x slower *and* wrong:
+92.7 s of ASR on an 11 s clip, and the text was nonsense ("proc bicy at fare Twilight
+...") instead of the JFK sentence. The integer matrix operators that q8 needs are not
+WebGPU operators, so each one copies tensors back to the CPU.
+
+### Whisper on WebGPU needs an fp32 encoder, and was not faster for tiny.en
+
+The WebGPU weights are different files from q8. Per-file `dtype` combinations, on
+`sample.wav` (cold, one run each):
+
+| Encoder | Merged decoder | ASR | Words | Transcript |
+|---|---|---|---|---|
+| fp16 | q4f16 | 32721 | 298 | breaks: repeats ">> Hello." for the whole clip |
+| fp16 | q4 | 28086 | 298 | breaks the same way |
+| fp32 | q4 | 9650 | 72 | content right, "I heard of deep" |
+| fp32 | q4f16 | 11518 | 72 | content right, same slip |
+| fp32 | fp16 | 11361 | 76 | matches the WASM transcript exactly |
+
+The encoder's precision is what decides it: every fp16 encoder degenerated into a
+repetition loop and lost the conversation, and every fp32 encoder was correct. A single
+`dtype: 'q4f16'` string cannot be used at all: it asks for `encoder_model_q4f16.onnx`,
+which these repositories do not have (the encoder ships `_fp16`, not `_q4f16`), and the
+load fails with `Unsupported model type: whisper` from the pipeline's second attempt.
+
+With the safe fp32 encoder, Whisper on WebGPU was *slower* than q8 on WASM for `tiny.en`
+(9.7 to 11.5 s against 8.1 s), and the download grows: fp32 encoder + fp16 decoder is
+~95 MB for tiny.en, ~190 MB for base.en, and ~664 MB for small.en, against 44, 80, and
+252 MB for q8. So `tiny.en` stays on WASM.
+
+For `base.en` the GPU does win, which fits the usual pattern that per-token GPU dispatch
+overhead dominates only for very small models (warm, two reps):
+
+| Backend | ASR | Diarization | Total | Words |
+|---|---|---|---|---|
+| WASM q8 | 16157, 13081 | 36461, 37851 | 52666, 50942 | 72 |
+| WebGPU fp32+fp16 | 6459, 9349 | 3001, 4893 | 9462, 14247 | 79 |
+
+The WebGPU transcript was slightly better there, keeping "I thought, you know," and
+"At least, you know," that the WASM run dropped, with the same two speakers. Moving
+Whisper to the GPU for `base.en` and `small.en` is therefore a real option; it is not
+done here because it trades a much larger download for it, which is a product decision.
+
+### Caveats
+
+- One GPU (Intel Xe-LPG) and one browser. Apple GPUs on macOS are untested, and ORT's
+  WebGPU kernels have had driver-specific numerical problems before, so a Mac check is
+  worth doing before relying on these numbers there.
+- The repeated runs drift: an identical WASM configuration measured 8130 ms and 11725 ms
+  of ASR at different points, because sustained CPU load on a laptop throttles. Treat
+  anything under about 1.5x as noise; the diarization result is far above that.
+- Browsers without WebGPU (Safari before 26, Firefox without WebGPU in workers) take the
+  WASM path, which is what the app did everywhere before this change.
+
+The harness is `bench/` (not committed): `bench.html` and `bench.js` time one
+transcribe+diarize run on a chosen provider and leave the result on `window.__bench`,
+and `run-bench.mjs` drives it in real Chrome through Playwright's `channel: 'chrome'`
+and writes `bench/out/<backend>-<fixture>-<model>.json`.
