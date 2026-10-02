@@ -142,20 +142,55 @@ function dequeued(decoder) {
  */
 export async function decodeMp4AudioTrack(blob, track, outputRate, { onProgress } = {}) {
   if (typeof AudioDecoder === 'undefined' || typeof EncodedAudioChunk === 'undefined') return null;
-  const config = { codec: track.codec, sampleRate: track.sampleRate, numberOfChannels: track.numberOfChannels };
-  if (track.description) config.description = track.description;
-  try {
-    if (!(await AudioDecoder.isConfigSupported(config)).supported) return null;
-  } catch {
-    return null; // an invalid config, such as a zero sample rate
-  }
+  const base = { codec: track.codec, sampleRate: track.sampleRate, numberOfChannels: track.numberOfChannels };
+  // `isConfigSupported` answers for the codec, not for this particular stream,
+  // so a config it accepts can still fail when the decoder starts ("Unsupported
+  // configuration"). The codec-private data is the usual reason: a track whose
+  // data this file does not carry, or carries in a box that is not read here,
+  // configures only without it. So try the configs in order of preference and
+  // keep the first that decodes; `decodeWithConfig` throws for a decoder that
+  // fails, and that is what moves on to the next one.
+  const configs = [];
+  if (track.description) configs.push({ ...base, description: track.description });
+  configs.push(base);
 
+  let lastFailure = null;
+  for (const config of configs) {
+    let supported = false;
+    try {
+      supported = (await AudioDecoder.isConfigSupported(config)).supported;
+    } catch {
+      continue; // an invalid config, such as a zero sample rate
+    }
+    if (!supported) continue;
+    try {
+      return await decodeWithConfig(blob, track, outputRate, config, onProgress);
+    } catch (error) {
+      // Only a decoder that never produced a sample is worth retrying with
+      // another config. Once audio has come out, the configuration was right
+      // and the failure is in the stream, so report that instead of decoding
+      // the file again and returning whatever the second attempt manages.
+      if (error?.decodedSomething) throw error;
+      lastFailure = error;
+    }
+  }
+  if (!lastFailure) return null; // no config this browser would even consider
+  // Name the track, so a report of this says which audio it could not handle.
+  const detail = `${track.codec}, ${track.sampleRate} Hz, `
+    + `${track.numberOfChannels} channel${track.numberOfChannels === 1 ? '' : 's'}`;
+  throw new Error(`${lastFailure?.message ?? lastFailure} [${detail}]`);
+}
+
+/** One decode attempt with one decoder configuration. */
+async function decodeWithConfig(blob, track, outputRate, config, onProgress) {
   const pcm = new PcmBuffer(Math.ceil((track.duration + 1) * outputRate));
   let resampler = null;
   let inputRate = 0;
   let failure = null;
+  let decodedSomething = false;
   const decoder = new AudioDecoder({
     output(data) {
+      decodedSomething = true;
       try {
         if (data.sampleRate !== inputRate) {
           if (resampler) pcm.append(resampler.flush());
@@ -209,7 +244,10 @@ export async function decodeMp4AudioTrack(blob, track, outputRate, { onProgress 
   } finally {
     if (decoder.state !== 'closed') decoder.close();
   }
-  if (failure) throw failure;
+  if (failure) {
+    if (decodedSomething && failure instanceof Error) failure.decodedSomething = true;
+    throw failure;
+  }
   if (resampler) pcm.append(resampler.flush());
   onProgress?.(1);
   return pcm.result();

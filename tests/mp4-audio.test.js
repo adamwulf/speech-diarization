@@ -82,7 +82,7 @@ test('readMp4AudioTrack returns null for other files', async () => {
  * frames at 48 kHz: the left channel is chunk.data[0] / 100 and the right
  * channel is 0, so the mono mix is chunk.data[0] / 200.
  */
-function installFakeWebCodecs({ supported = true, failAt = -1 } = {}) {
+function installFakeWebCodecs({ supported = true, failAt = -1, failAtStart = false, failWithDescription = false } = {}) {
   const decoded = [];
   class FakeEncodedAudioChunk {
     constructor({ type, timestamp, duration, data }) {
@@ -112,6 +112,16 @@ function installFakeWebCodecs({ supported = true, failAt = -1 } = {}) {
     configure(config) {
       this.config = config;
       this.state = 'configured';
+      // Chrome reports a decoder that cannot start through the error callback,
+      // after configure() has returned, even for a config isConfigSupported()
+      // accepted.
+      if (failAtStart || (failWithDescription && config.description)) {
+        setTimeout(() => {
+          if (this.state === 'closed') return;
+          this.state = 'closed';
+          this.#error(new Error('NotSupportedError: Unsupported configuration.'));
+        }, 0);
+      }
     }
 
     decode(chunk) {
@@ -205,6 +215,40 @@ test('decodeMp4AudioTrack decodes every sample in order and resamples to mono', 
 
 test('decodeMp4AudioTrack rejects with the decoder error', async (t) => {
   t.after(removeFakeWebCodecs);
+  installFakeWebCodecs({ failAt: 5 });
+  const { bytes } = buildMp4();
+  const blob = new Blob([bytes]);
+  const { audio } = await readMp4AudioTrack(blob);
+  await assert.rejects(decodeMp4AudioTrack(blob, audio, 16000), /EncodingError: bad chunk/);
+});
+
+test('decodeMp4AudioTrack retries without the codec description when the decoder will not start', async (t) => {
+  t.after(removeFakeWebCodecs);
+  installFakeWebCodecs({ failWithDescription: true });
+  const { bytes } = buildMp4();
+  const blob = new Blob([bytes]);
+  const { audio } = await readMp4AudioTrack(blob);
+  assert.ok(audio.description, 'the fixture carries an AudioSpecificConfig');
+  const pcm = await decodeMp4AudioTrack(blob, audio, 16000);
+  assert.ok(pcm.length > 0, 'the second configuration decoded the track');
+});
+
+test('decodeMp4AudioTrack names the track when no configuration decodes', async (t) => {
+  t.after(removeFakeWebCodecs);
+  installFakeWebCodecs({ failAtStart: true });
+  const { bytes } = buildMp4();
+  const blob = new Blob([bytes]);
+  const { audio } = await readMp4AudioTrack(blob);
+  await assert.rejects(decodeMp4AudioTrack(blob, audio, 16000), (error) => {
+    assert.match(error.message, /mp4a\.40\.2, 48000 Hz, 2 channels/);
+    return true;
+  });
+});
+
+test('a failure after audio has decoded is reported, not retried', async (t) => {
+  t.after(removeFakeWebCodecs);
+  // failAt 5 is a stream problem: the configuration was right, so a second
+  // attempt with a different one must not quietly replace the error.
   installFakeWebCodecs({ failAt: 5 });
   const { bytes } = buildMp4();
   const blob = new Blob([bytes]);

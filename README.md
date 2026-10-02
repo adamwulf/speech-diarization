@@ -35,12 +35,15 @@ or HTTPS. Transcribing a file works on any origin.
 
 - **Start recording**, speak, then **Stop recording** to transcribe.
   **Transcribe file…** accepts any audio format the browser can decode
-  (WAV, MP3, M4A, WebM, and so on), and video files (such as MP4) that have an
-  audio track. If the browser cannot decode an MP4, M4A, or MOV file directly
-  (this can occur with a long video, such as a Zoom recording), the page reads
-  only the file's audio track and decodes it with WebCodecs. This needs a
-  browser whose WebCodecs can decode the track's codec (tested with AAC in
-  Chrome).
+  (WAV, MP3, M4A, WebM, and so on), and video files (such as MP4 and MOV) that
+  have an audio track. If the browser cannot decode an MP4, M4A, or MOV file
+  directly (this can occur with a long recording), the page reads only the
+  file's audio track and decodes it with WebCodecs, trying the track's own
+  codec settings first and then without them, since a browser can accept a
+  codec and still refuse one particular stream. This needs a browser whose
+  WebCodecs can decode the track's codec (tested with AAC in Chrome). When no
+  setting works, the message names the codec, sample rate, and channel count,
+  and converting the file to WAV or MP3 will let it through.
 - **Each new recording or file replaces** the current audio, transcript, and
   speaker names. If the new audio fails to decode or transcribe, the previous
   transcript stays on screen.
