@@ -5,9 +5,10 @@
 // cross-origin isolation it gets one thread, so it is much slower. The choice
 // is made once per worker, before any model loads.
 //
-// The speaker models run on WebGPU when there is a GPU. Whisper stays on WASM:
-// the browser checks in INFERENCE.md measured WebGPU slower than WASM for the
-// default model, and its WebGPU weights are a different, larger download.
+// Both pipelines run on WebGPU when there is a GPU. The speaker models load the
+// same files either way; Whisper does not, so `BACKEND_VARIANTS` in
+// `asr-models.js` picks its weights per provider, and Whisper alone falls back
+// to WASM if the GPU cannot load or run it. INFERENCE.md has the measurements.
 
 /** The backends the worker knows, fastest first. */
 export const BACKENDS = Object.freeze(['webgpu', 'wasm']);
