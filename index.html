@@ -12,27 +12,12 @@
 <body>
   <div class="app">
     <header class="app-header">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4" />
-          </svg>
-        </span>
-        <div class="brand-text">
-          <h1>Speech Recognition &amp; Diarization</h1>
-          <p class="tagline">Speech-to-text with speaker labels. Whisper and the speaker models run on this device.</p>
-        </div>
-      </div>
-      <p class="chip" title="Model files are downloaded once; your audio is never uploaded.">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
-        </svg>
-        Audio stays on this device
-      </p>
+      <h1>Speech Recognition &amp; Diarization</h1>
+      <p class="tagline">Speech-to-text with speaker labels. Runs on this device; audio is never uploaded.</p>
     </header>
 
     <main class="layout">
-      <!-- LEFT: sources, options, model progress -->
+      <!-- LEFT: sources, options, model state -->
       <section class="panel controls" aria-labelledby="recogHeading">
         <h2 class="label" id="recogHeading">Speech recognition</h2>
 
@@ -47,10 +32,6 @@
             accept="audio/*,video/*,.m4a,.m4b,.mp4,.m4v,.mov,.mp3,.wav,.aac,.caf,.amr,.3gp,.ogg,.oga,.opus,.flac,.webm,.mkv"
             hidden />
         </div>
-        <p class="helper">
-          Record, then click “Stop recording” to transcribe — or pick an audio or video file.
-          Each new recording or file replaces the current audio, transcript, and speaker names.
-        </p>
 
         <!-- Native canvas mic level meter. The wrapper collapses unless the mic is
              live; the canvas keeps its box so its ResizeObserver measures it. -->
@@ -62,41 +43,26 @@
 
         <div class="field">
           <div class="check">
-            <input type="checkbox" id="speakersToggle" checked aria-describedby="speakersHelp" />
+            <input type="checkbox" id="speakersToggle" checked />
             <label for="speakersToggle">Detect speakers</label>
           </div>
-          <p class="helper" id="speakersHelp">
-            Labels who spoke when. When off, new audio skips speaker detection and speaker
-            names are hidden in the transcript and exports. Turning it back on detects
-            speakers in the current audio if needed.
-          </p>
         </div>
 
         <div class="field">
-          <label for="asrModelSelect" class="label">Speech recognition model</label>
+          <label for="asrModelSelect" class="label">Model</label>
           <!-- Options come from src/asr-models.js. -->
-          <select id="asrModelSelect" aria-describedby="asrModelHelp"></select>
-          <p class="helper" id="asrModelHelp">
-            Larger models make fewer mistakes, but they download more data and transcribe
-            more slowly. The selected model starts to load one second after you select it,
-            and is used for the next transcription. Each model downloads only the first time; after that, it loads
-            from the browser cache.
-          </p>
-        </div>
-
-        <div class="field">
-          <h3 class="label">Models</h3>
-          <div class="model-line" id="asrModel"><span id="asrModelInfo">Whisper tiny.en · speech-to-text · ~44 MB · runs locally</span><span class="model-state" id="asrModelState"></span></div>
-          <div class="model-line" id="diarModel"><span id="diarModelInfo">pyannote + WeSpeaker · speaker diarization · ~34 MB · runs locally</span><span class="model-state" id="diarModelState"></span></div>
+          <select id="asrModelSelect"></select>
+          <div class="model-rows">
+            <div class="model-line" id="asrModel"><span id="asrModelInfo">Whisper tiny.en · ~44 MB</span><span class="model-state" id="asrModelState"></span></div>
+            <div class="model-line" id="diarModel"><span id="diarModelInfo">pyannote + WeSpeaker · ~34 MB</span><span class="model-state" id="diarModelState"></span></div>
+          </div>
         </div>
 
         <div class="statusbar">
           <div class="track" id="track" role="progressbar" aria-label="Task progress" aria-valuemin="0" aria-valuemax="100" hidden>
             <div class="fill" id="fill"></div>
           </div>
-          <div class="status" id="status" role="status" aria-live="polite" tabindex="-1">
-            Ready. Click “Start recording”, or transcribe an audio or video file. The models load in the background.
-          </div>
+          <div class="status" id="status" role="status" aria-live="polite" tabindex="-1">Ready</div>
           <div class="buttons" id="retryRow" hidden>
             <button type="button" class="primary" id="retryBtn">Retry</button>
           </div>
@@ -108,8 +74,8 @@
         <div class="panel-head">
           <h2 class="label" id="transcriptHeading">Transcript</h2>
           <div class="buttons compact">
-            <button type="button" id="exportMdBtn" disabled>Export Markdown</button>
-            <button type="button" id="exportVttBtn" disabled>Export WebVTT</button>
+            <button type="button" id="exportMdBtn" disabled>Markdown</button>
+            <button type="button" id="exportVttBtn" disabled>WebVTT</button>
             <button type="button" id="clearBtn" disabled>Clear</button>
           </div>
         </div>
@@ -121,18 +87,11 @@
 
         <div class="speakers" id="speakersSection" hidden>
           <h3 class="label">Speakers</h3>
-          <p class="helper flush">
-            Rename a speaker to update every matching turn and both exports.
-            Leave a name blank to use the default.
-          </p>
           <div class="speaker-list" id="speakerList"></div>
         </div>
 
-        <!-- main.js replaces this element's textContent, so its waveform glyph is a
-             CSS background rather than a child element. -->
-        <p class="empty" id="transcriptEmpty">
-          No transcript yet. Record or choose an audio or video file to get started.
-        </p>
+        <!-- main.js replaces this element's textContent, so it holds no child nodes. -->
+        <p class="empty" id="transcriptEmpty">No transcript yet</p>
         <ol class="turns" id="transcriptList" aria-label="Transcript turns" hidden></ol>
       </section>
     </main>

@@ -1,69 +1,62 @@
-/* Visual language: neutral surfaces, one accent, 1px borders, small radii, and a
-   compact type scale — the plain "tool" look rather than a marketing page. The
-   token names --bg, --bar-bg, --accent and --chosen are read by the level meter
-   in audio.js, so they keep their names. */
+/* Neutral greys, one restrained accent, small radii, and hairlines instead of
+   nested boxes. The token names --bg, --bar-bg, --accent and --chosen are read
+   by the level meter in audio.js, so they keep their names. */
 :root {
   color-scheme: dark light;
 
-  --bg: #0b0d11;
-  --surface: #13161c;
-  --surface-2: #191d25;
-  --surface-3: #212630;
-  --text: #e8ecf3;
-  --muted: #98a3b5;
-  --faint: #6f7a8b;
-  --border: #242a35;
-  --border-strong: #323a49;
+  --bg: #0d0d0e;
+  --surface: #151517;
+  --surface-2: #1c1c1f;
+  --surface-3: #232327;
+  --text: #ececee;
+  --muted: #9d9da3;
+  --faint: #74747b;
+  --border: #252528;
+  --border-strong: #35353a;
 
-  --accent: #589bff;
-  --accent-hover: #74adff;
-  --accent-ink: #061120;
-  --accent-soft: rgba(88, 155, 255, 0.14);
+  /* Used for focus, the progress bar and the first speaker — nothing else. */
+  --accent: #7d9bd1;
+  --accent-ink: #0d0d0e;
 
-  --chosen: #f2c45a;
-  --danger: #ff6b6b;
-  --ok: #5fd3a8;
-  --nontop: #d986ff;
-  --bar-bg: #1e232d;
+  --chosen: #cfa65f;
+  --danger: #d9655f;
+  --ok: #6fa98a;
+  --nontop: #a98cc4;
+  --bar-bg: #1f1f23;
 
-  /* Speaker colors, in the order speakers first appear. */
-  --speaker-4: #5fd3a8;
-  --speaker-5: #ff9f5a;
-  --speaker-6: #b7c4ff;
+  /* Speaker colours, in the order speakers first appear. */
+  --speaker-4: #6fa98a;
+  --speaker-5: #c68a63;
+  --speaker-6: #8e9bc4;
 
-  --radius: 10px;
-  --radius-sm: 7px;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --radius: 6px;
+  --radius-sm: 5px;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f6f7f9;
+    --bg: #fbfbfa;
     --surface: #ffffff;
-    --surface-2: #f4f6f9;
-    --surface-3: #e9edf3;
-    --text: #141821;
-    --muted: #5b6676;
-    --faint: #7a8494;
-    --border: #e2e6ed;
-    --border-strong: #cfd6e0;
+    --surface-2: #f5f5f4;
+    --surface-3: #ebebe9;
+    --text: #1b1b1a;
+    --muted: #5f5f5c;
+    --faint: #85857f;
+    --border: #e4e4e1;
+    --border-strong: #cfcfca;
 
-    --accent: #1f6feb;
-    --accent-hover: #3b82f6;
+    --accent: #3f5f99;
     --accent-ink: #ffffff;
-    --accent-soft: rgba(31, 111, 235, 0.1);
 
-    --chosen: #a9701a;
-    --danger: #c7382f;
-    --ok: #15803d;
-    --nontop: #9333ea;
-    --bar-bg: #e9edf3;
+    --chosen: #8a6418;
+    --danger: #a93a33;
+    --ok: #2f6b4f;
+    --nontop: #6d4e91;
+    --bar-bg: #e9e9e6;
 
-    --speaker-4: #0f766e;
-    --speaker-5: #b45309;
-    --speaker-6: #4f46e5;
-
-    --shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --speaker-4: #2f6b4f;
+    --speaker-5: #8a5223;
+    --speaker-6: #434f80;
   }
 }
 
@@ -82,98 +75,65 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 
-.app { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
+.app { max-width: 1140px; margin: 0 auto; padding: 32px 24px 48px; }
 
 /* ---- Header ---- */
-.app-header {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 20px; flex-wrap: wrap;
-  padding-bottom: 18px; margin-bottom: 20px;
-  border-bottom: 1px solid var(--border);
-}
-.brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
-.brand-mark {
-  flex: none;
-  display: grid; place-items: center;
-  width: 38px; height: 38px; border-radius: var(--radius-sm);
-  background: var(--accent-soft); color: var(--accent);
-}
-.brand-mark svg { width: 21px; height: 21px; }
-.brand-text { min-width: 0; }
-h1 { font-size: 18px; font-weight: 650; letter-spacing: -0.01em; margin: 0; }
-.tagline { color: var(--muted); font-size: 13.5px; margin: 2px 0 0; }
+.app-header { margin-bottom: 22px; }
+h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.005em; margin: 0; }
+.tagline { color: var(--faint); font-size: 13px; margin: 3px 0 0; }
 
-.chip {
-  display: inline-flex; align-items: center; gap: 7px;
-  margin: 0; padding: 6px 11px;
-  font-size: 12.5px; color: var(--muted);
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 999px; white-space: nowrap;
-}
-.chip svg { width: 13px; height: 13px; flex: none; }
-
-/* ---- Layout: a fixed control column beside the transcript, stacked on narrow screens ---- */
+/* ---- Layout ---- */
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 370px) minmax(0, 1fr);
-  gap: 18px; align-items: stretch;
+  grid-template-columns: minmax(0, 330px) minmax(0, 1fr);
+  gap: 16px; align-items: start;
 }
 @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
-
-.controls { display: flex; flex-direction: column; }
-/* Pinned to the foot of the column, so the eye always finds it in one place. */
-.controls .statusbar { margin-top: auto; }
 
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px;
-  box-shadow: var(--shadow);
+  padding: 16px;
 }
 
 /* ---- Eyebrow labels ---- */
 .label {
   display: block; margin: 0 0 10px;
-  font-size: 11px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.08em;
+  font-size: 10.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.09em;
   color: var(--faint);
 }
 
-/* Groups of related controls, separated by a hairline instead of whitespace alone. */
-.field { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+.field { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
 
 /* ---- Buttons ---- */
-.buttons { display: flex; gap: 9px; flex-wrap: wrap; }
-.controls > .buttons { margin-bottom: 2px; }
+.buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 button {
-  font-size: 14px; font-weight: 550; font-family: inherit;
-  padding: 9px 15px;
+  font-size: 13.5px; font-weight: 500; font-family: inherit;
+  padding: 8px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
-  background: var(--surface-2);
+  background: transparent;
   color: var(--text);
   cursor: pointer;
-  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
-button:hover:not(:disabled) { background: var(--surface-3); border-color: var(--muted); }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
-/* Live mic state: red so "we're recording" is unmistakable. */
+button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--muted); }
+/* The one filled control: the text colour inverted, not a bright hue. */
+button.primary { background: var(--text); border-color: var(--text); color: var(--bg); }
+button.primary:hover:not(:disabled) { background: var(--muted); border-color: var(--muted); }
 button.recording { background: var(--danger); border-color: var(--danger); color: #fff; }
-button.recording:hover:not(:disabled) { background: #ff8585; border-color: #ff8585; }
-button:disabled { opacity: 0.42; cursor: not-allowed; }
+button.recording:hover:not(:disabled) { background: #e2817c; border-color: #e2817c; }
+button:disabled { opacity: 0.38; cursor: not-allowed; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button.primary:focus-visible, button.recording:focus-visible { outline-color: var(--text); }
-.buttons.compact button { font-size: 13px; padding: 7px 12px; }
+.buttons.compact button { font-size: 12.5px; padding: 6px 11px; }
 
-/* A small pulsing dot in the status line while recording. */
 .rec-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--danger); display: inline-block; margin-right: 8px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--danger); display: inline-block; margin-right: 7px;
   vertical-align: middle; animation: pulse 1.2s ease-in-out infinite;
 }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
@@ -185,74 +145,62 @@ input[type="text"], select {
   color: var(--text);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  padding: 9px 12px;
-  font-size: 14px; font-family: inherit;
+  padding: 8px 11px;
+  font-size: 13.5px; font-family: inherit;
 }
 input[type="text"]::placeholder { color: var(--faint); opacity: 1; }
 input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
-select:disabled { opacity: 0.42; cursor: not-allowed; }
+select:disabled { opacity: 0.38; cursor: not-allowed; }
 
-.check { display: flex; align-items: center; gap: 10px; }
+.check { display: flex; align-items: center; gap: 9px; }
 .check input {
-  width: 17px; height: 17px; margin: 0; flex: none;
+  width: 16px; height: 16px; margin: 0; flex: none;
   accent-color: var(--accent); cursor: pointer;
 }
 .check input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.check input:disabled { opacity: 0.42; cursor: not-allowed; }
-.check label {
-  margin: 0; font-size: 14px; font-weight: 550; color: var(--text); cursor: pointer;
-}
-.check input:disabled + label { opacity: 0.42; cursor: not-allowed; }
-
-/* Explanatory copy: present, but never competing with the controls. */
-.helper { color: var(--faint); font-size: 12.5px; line-height: 1.5; margin: 9px 0 0; }
-.helper.flush { margin: 0 0 10px; }
+.check input:disabled { opacity: 0.38; cursor: not-allowed; }
+.check label { margin: 0; font-size: 13.5px; color: var(--text); cursor: pointer; }
+.check input:disabled + label { opacity: 0.38; cursor: not-allowed; }
 
 /* ---- Mic meter: takes up space only while the mic is live ---- */
 .meter-wrap {
   max-height: 0; opacity: 0; overflow: hidden;
-  transition: max-height 0.25s ease, opacity 0.2s ease, margin-top 0.25s ease;
+  transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.22s ease;
 }
-.controls:has(#micBtn.recording) .meter-wrap { max-height: 90px; opacity: 1; margin-top: 14px; }
+.controls:has(#micBtn.recording) .meter-wrap { max-height: 80px; opacity: 1; margin-top: 12px; }
 /* Without :has() support the meter simply stays visible, as it was before. */
 @supports not selector(:has(*)) {
-  .meter-wrap { max-height: none; opacity: 1; margin-top: 14px; }
+  .meter-wrap { max-height: none; opacity: 1; margin-top: 12px; }
 }
-.meter {
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  overflow: hidden;
-  background: var(--bar-bg);
-}
+.meter { border-radius: var(--radius-sm); overflow: hidden; background: var(--bar-bg); }
 canvas { display: block; max-width: 100%; }
-.meter canvas { width: 100%; height: 56px; }
+.meter canvas { width: 100%; height: 48px; }
 
-/* ---- Model rows ---- */
+/* ---- Model rows: plain lines, divided by hairlines ---- */
+.model-rows { margin-top: 12px; }
 .model-line {
-  font-size: 12.5px; color: var(--muted);
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 9px 12px; line-height: 1.5;
+  font-size: 12.5px; color: var(--faint);
+  padding: 7px 0; line-height: 1.5;
   overflow-wrap: anywhere;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: color 0.15s ease;
 }
-.model-line + .model-line { margin-top: 7px; }
-/* The model doing the work right now, and a dimmed one that is switched off. */
-.model-line.active { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
-.model-line.off { opacity: 0.5; }
-.model-state { font-weight: 600; }
+.model-line + .model-line { border-top: 1px solid var(--border); }
+.model-line.active { color: var(--text); }
+.model-line.off { opacity: 0.45; }
+.model-state { font-weight: 500; }
 .model-state[data-state="queued"], .model-state[data-state="loading"] { color: var(--chosen); }
 .model-state[data-state="ready"] { color: var(--ok); }
 .model-state[data-state="failed"] { color: var(--danger); }
 
 /* ---- Status and progress ---- */
-.statusbar { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.statusbar { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
 .track {
   position: relative; overflow: hidden;
-  background: var(--bar-bg); border-radius: 999px; height: 6px;
-  margin-bottom: 11px;
+  background: var(--bar-bg); border-radius: 2px; height: 3px;
+  margin-bottom: 10px;
 }
 .fill {
-  height: 100%; width: 0; border-radius: 999px;
+  height: 100%; width: 0;
   background: var(--accent);
   transition: width 0.35s ease; min-width: 2px;
 }
@@ -262,38 +210,33 @@ canvas { display: block; max-width: 100%; }
 }
 @keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 
-.status { min-height: 20px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.status { min-height: 20px; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
 .status:focus { outline: none; }
 .status.error { color: var(--danger); }
 .status.warning { color: var(--chosen); }
-.meta-value { font-variant-numeric: tabular-nums; font-weight: 650; color: var(--text); }
-#retryRow { margin-top: 12px; }
+.meta-value { font-variant-numeric: tabular-nums; color: var(--text); }
+#retryRow { margin-top: 10px; }
 
-/* ---- Transcript panel ---- */
-.transcript-panel { display: flex; flex-direction: column; min-height: 440px; }
+/* ---- Transcript ---- */
+.transcript-panel { display: flex; flex-direction: column; min-height: 420px; }
 .panel-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; flex-wrap: wrap;
-  padding-bottom: 14px; margin-bottom: 2px;
-  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px; border-bottom: 1px solid var(--border);
 }
 .panel-head .label { margin: 0; }
 
 .source { margin-top: 14px; }
-.source-info { margin: 0 0 9px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
-.source-info strong { color: var(--text); font-weight: 600; }
-audio { display: block; width: 100%; height: 34px; }
+.source-info { margin: 0 0 8px; color: var(--faint); font-size: 12.5px; overflow-wrap: anywhere; }
+.source-info strong { color: var(--text); font-weight: 500; }
+audio { display: block; width: 100%; height: 32px; }
 
-.speakers { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
-.speaker-list { display: flex; flex-direction: column; gap: 8px; }
-.speaker-row { display: grid; grid-template-columns: minmax(110px, auto) minmax(0, 1fr); gap: 10px; align-items: center; }
-.speaker-row label {
-  margin: 0; display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: var(--muted);
-}
-/* A name field does not need the full column width. */
-.speaker-row input[type="text"] { max-width: 340px; }
-.swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--spk, var(--muted)); }
+.speakers { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.speaker-list { display: flex; flex-direction: column; gap: 7px; }
+.speaker-row { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr); gap: 10px; align-items: center; }
+.speaker-row label { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.speaker-row input[type="text"] { max-width: 300px; }
+.swatch { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--spk, var(--muted)); }
 
 [data-color="0"] { --spk: var(--accent); }
 [data-color="1"] { --spk: var(--chosen); }
@@ -302,73 +245,54 @@ audio { display: block; width: 100%; height: 34px; }
 [data-color="4"] { --spk: var(--speaker-5); }
 [data-color="5"] { --spk: var(--speaker-6); }
 
-/* The empty state fills the panel so the column never looks abandoned. Its
-   waveform glyph is a background image because main.js rewrites the text. */
 .empty {
   flex: 1 1 auto;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; margin: 0; padding: 32px 24px;
-  color: var(--faint); font-size: 13.5px; max-width: 42ch; align-self: center;
-}
-/* A pseudo-element, not a child: main.js rewrites this element's textContent,
-   which would delete any real node. The mask gives it the current text colour. */
-.empty::before {
-  content: ''; display: block;
-  width: 36px; height: 36px; margin-bottom: 14px;
-  background: currentColor; opacity: 0.55;
-  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round"><path d="M3 11v2M7 8v8M11 4v16M15 8v8M19 11v2"/></svg>') center / contain no-repeat;
-  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round"><path d="M3 11v2M7 8v8M11 4v16M15 8v8M19 11v2"/></svg>') center / contain no-repeat;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; margin: 0; padding: 40px 20px;
+  color: var(--faint); font-size: 13px;
 }
 
-/* ---- Turns ---- */
+/* Turns are rows in a list, not a stack of cards. */
 .turns {
-  list-style: none; margin: 14px 0 0; padding: 0;
-  display: flex; flex-direction: column; gap: 7px;
-  /* Long recordings run to hundreds of turns; keep the panel's head reachable. */
-  max-height: min(68vh, 760px); overflow-y: auto;
+  list-style: none; margin: 0; padding: 0;
+  /* Long recordings run to hundreds of turns, so the head stays reachable. */
+  max-height: min(70vh, 780px); overflow-y: auto;
   scrollbar-width: thin;
 }
-.turn {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--spk, var(--border-strong));
-  border-radius: var(--radius-sm);
-  padding: 10px 13px;
-}
-.turn-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 12px; }
-.turn-speaker { font-weight: 650; color: var(--spk, var(--text)); overflow-wrap: anywhere; }
-.turn-speaker.unknown { color: var(--faint); font-style: italic; font-weight: 600; }
+.turn { padding: 11px 0; }
+.turn + .turn { border-top: 1px solid var(--border); }
+.turn-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 9px; font-size: 11.5px; }
+.turn-speaker { font-weight: 600; color: var(--spk, var(--text)); overflow-wrap: anywhere; }
+.turn-speaker.unknown { color: var(--faint); font-style: italic; font-weight: 500; }
 .turn-time {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  color: var(--faint); font-variant-numeric: tabular-nums; font-size: 11.5px;
+  color: var(--faint); font-variant-numeric: tabular-nums; font-size: 11px;
 }
-.turn-text { margin: 3px 0 0; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+.turn-text { margin: 2px 0 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 
 /* ---- Credits ---- */
-.credits { margin-top: 20px; }
+.credits { margin-top: 18px; }
 .credits summary {
   cursor: pointer; width: fit-content;
-  font-size: 12.5px; color: var(--muted);
-  padding: 5px 2px;
+  font-size: 12px; color: var(--faint); padding: 4px 2px;
 }
 .credits summary:hover { color: var(--text); }
-.credits summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-.footnote { margin: 6px 0 0; color: var(--faint); font-size: 12px; line-height: 1.65; max-width: 90ch; }
+.credits summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.footnote { margin: 6px 0 0; color: var(--faint); font-size: 11.5px; line-height: 1.65; max-width: 90ch; }
 .footnote a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
-.footnote a:hover { color: var(--accent); }
+.footnote a:hover { color: var(--text); }
 
 /* ---- Narrow screens ---- */
 @media (max-width: 600px) {
-  .app { padding: 20px 16px 36px; }
-  .app-header { gap: 12px; }
-  .layout { gap: 14px; }
-  .panel { padding: 15px; }
+  .app { padding: 22px 16px 36px; }
+  .layout { gap: 12px; }
+  .panel { padding: 14px; }
   .buttons button { flex: 1 1 auto; }
   /* 16px keeps iOS from zooming in when a field gets focus. */
   input[type="text"], select { font-size: 16px; }
   .speaker-row { grid-template-columns: minmax(0, 1fr); gap: 5px; }
   .speaker-row input[type="text"] { max-width: none; }
-  .transcript-panel { min-height: 320px; }
+  .transcript-panel { min-height: 280px; }
   .turns { max-height: none; overflow-y: visible; }
 }
 
