@@ -3,25 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="color-scheme" content="dark light" />
   <meta name="description" content="Speech-to-text with speaker labels, running entirely in your browser." />
   <title>Speech Recognition &amp; Diarization</title>
   <link rel="icon" href="data:," />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-  <div class="wrap">
-    <h1>Speech Recognition &amp; Diarization</h1>
-    <p class="subtitle">
-      Speech-to-text with speaker labels, running entirely in your browser —
-      local Whisper and speaker-diarization models (one-time download, which starts when the page opens).
-      Your audio never leaves this device.
-    </p>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4" />
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>Speech Recognition &amp; Diarization</h1>
+          <p class="tagline">Speech-to-text with speaker labels. Whisper and the speaker models run on this device.</p>
+        </div>
+      </div>
+      <p class="chip" title="Model files are downloaded once; your audio is never uploaded.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
+        </svg>
+        Audio stays on this device
+      </p>
+    </header>
 
     <main class="layout">
       <!-- LEFT: sources, options, model progress -->
-      <section class="panel recog-panel" aria-labelledby="recogHeading">
-        <h2 class="section-label" id="recogHeading">Speech recognition</h2>
+      <section class="panel controls" aria-labelledby="recogHeading">
+        <h2 class="label" id="recogHeading">Speech recognition</h2>
+
         <div class="buttons">
           <button type="button" class="primary" id="micBtn">Start recording</button>
           <button type="button" id="fileBtn">Transcribe file…</button>
@@ -38,49 +52,67 @@
           Each new recording or file replaces the current audio, transcript, and speaker names.
         </p>
 
-        <!-- Native canvas mic level meter -->
-        <div class="meter">
-          <canvas id="meter" role="img" aria-label="Microphone input level"></canvas>
+        <!-- Native canvas mic level meter. The wrapper collapses unless the mic is
+             live; the canvas keeps its box so its ResizeObserver measures it. -->
+        <div class="meter-wrap">
+          <div class="meter">
+            <canvas id="meter" role="img" aria-label="Microphone input level"></canvas>
+          </div>
         </div>
 
-        <div class="check">
-          <input type="checkbox" id="speakersToggle" checked aria-describedby="speakersHelp" />
-          <label for="speakersToggle">Detect speakers</label>
-        </div>
-        <p class="helper" id="speakersHelp">
-          Labels who spoke when. When off, new audio skips speaker detection and speaker
-          names are hidden in the transcript and exports. Turning it back on detects
-          speakers in the current audio if needed.
-        </p>
-
-        <label for="asrModelSelect" class="section-label mt">Speech recognition model</label>
-        <!-- Options come from src/asr-models.js. -->
-        <select id="asrModelSelect" aria-describedby="asrModelHelp"></select>
-        <p class="helper" id="asrModelHelp">
-          Larger models make fewer mistakes, but they download more data and transcribe
-          more slowly. The selected model starts to load one second after you select it,
-          and is used for the next transcription. Each model downloads only the first time; after that, it loads
-          from the browser cache.
-        </p>
-
-        <h3 class="section-label mt">Models</h3>
-        <div class="model-line" id="asrModel"><span id="asrModelInfo">Whisper tiny.en · speech-to-text · ~44 MB · runs locally</span><span class="model-state" id="asrModelState"></span></div>
-        <div class="model-line" id="diarModel"><span id="diarModelInfo">pyannote + WeSpeaker · speaker diarization · ~34 MB · runs locally</span><span class="model-state" id="diarModelState"></span></div>
-        <div class="track" id="track" role="progressbar" aria-label="Task progress" aria-valuemin="0" aria-valuemax="100" hidden>
-          <div class="fill" id="fill"></div>
+        <div class="field">
+          <div class="check">
+            <input type="checkbox" id="speakersToggle" checked aria-describedby="speakersHelp" />
+            <label for="speakersToggle">Detect speakers</label>
+          </div>
+          <p class="helper" id="speakersHelp">
+            Labels who spoke when. When off, new audio skips speaker detection and speaker
+            names are hidden in the transcript and exports. Turning it back on detects
+            speakers in the current audio if needed.
+          </p>
         </div>
 
-        <div class="status" id="status" role="status" aria-live="polite" tabindex="-1">
-          Ready. Click “Start recording”, or transcribe an audio or video file. The models load in the background.
+        <div class="field">
+          <label for="asrModelSelect" class="label">Speech recognition model</label>
+          <!-- Options come from src/asr-models.js. -->
+          <select id="asrModelSelect" aria-describedby="asrModelHelp"></select>
+          <p class="helper" id="asrModelHelp">
+            Larger models make fewer mistakes, but they download more data and transcribe
+            more slowly. The selected model starts to load one second after you select it,
+            and is used for the next transcription. Each model downloads only the first time; after that, it loads
+            from the browser cache.
+          </p>
         </div>
-        <div class="buttons" id="retryRow" hidden>
-          <button type="button" class="primary" id="retryBtn">Retry</button>
+
+        <div class="field">
+          <h3 class="label">Models</h3>
+          <div class="model-line" id="asrModel"><span id="asrModelInfo">Whisper tiny.en · speech-to-text · ~44 MB · runs locally</span><span class="model-state" id="asrModelState"></span></div>
+          <div class="model-line" id="diarModel"><span id="diarModelInfo">pyannote + WeSpeaker · speaker diarization · ~34 MB · runs locally</span><span class="model-state" id="diarModelState"></span></div>
+        </div>
+
+        <div class="statusbar">
+          <div class="track" id="track" role="progressbar" aria-label="Task progress" aria-valuemin="0" aria-valuemax="100" hidden>
+            <div class="fill" id="fill"></div>
+          </div>
+          <div class="status" id="status" role="status" aria-live="polite" tabindex="-1">
+            Ready. Click “Start recording”, or transcribe an audio or video file. The models load in the background.
+          </div>
+          <div class="buttons" id="retryRow" hidden>
+            <button type="button" class="primary" id="retryBtn">Retry</button>
+          </div>
         </div>
       </section>
 
       <!-- RIGHT: current audio, speakers, transcript, exports -->
       <section class="panel transcript-panel" id="transcriptPanel" aria-labelledby="transcriptHeading" aria-busy="false">
-        <h2 class="section-label" id="transcriptHeading">Transcript</h2>
+        <div class="panel-head">
+          <h2 class="label" id="transcriptHeading">Transcript</h2>
+          <div class="buttons compact">
+            <button type="button" id="exportMdBtn" disabled>Export Markdown</button>
+            <button type="button" id="exportVttBtn" disabled>Export WebVTT</button>
+            <button type="button" id="clearBtn" disabled>Clear</button>
+          </div>
+        </div>
 
         <div class="source" id="sourceBlock" hidden>
           <p class="source-info" id="sourceInfo"></p>
@@ -88,7 +120,7 @@
         </div>
 
         <div class="speakers" id="speakersSection" hidden>
-          <h3 class="section-label mt">Speakers</h3>
+          <h3 class="label">Speakers</h3>
           <p class="helper flush">
             Rename a speaker to update every matching turn and both exports.
             Leave a name blank to use the default.
@@ -96,35 +128,34 @@
           <div class="speaker-list" id="speakerList"></div>
         </div>
 
+        <!-- main.js replaces this element's textContent, so its waveform glyph is a
+             CSS background rather than a child element. -->
         <p class="empty" id="transcriptEmpty">
           No transcript yet. Record or choose an audio or video file to get started.
         </p>
         <ol class="turns" id="transcriptList" aria-label="Transcript turns" hidden></ol>
-
-        <div class="buttons">
-          <button type="button" id="exportMdBtn" disabled>Export Markdown</button>
-          <button type="button" id="exportVttBtn" disabled>Export WebVTT</button>
-          <button type="button" id="clearBtn" disabled>Clear</button>
-        </div>
       </section>
     </main>
 
-    <p class="footnote repo-link">
-      Speech-to-text with Whisper
-      <a href="https://huggingface.co/onnx-community/whisper-tiny.en_timestamped" target="_blank" rel="noopener">tiny.en</a>,
-      <a href="https://huggingface.co/onnx-community/whisper-base.en_timestamped" target="_blank" rel="noopener">base.en</a>, or
-      <a href="https://huggingface.co/onnx-community/whisper-small.en_timestamped" target="_blank" rel="noopener">small.en</a>
-      via <a href="https://github.com/huggingface/transformers.js" target="_blank" rel="noopener">Transformers.js</a>.
-      Speaker diarization with <a href="https://github.com/briox/diarization-js" target="_blank" rel="noopener">diarization-js</a>,
-      a port of <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noopener">pyannote speaker-diarization-community-1</a>
-      by the <a href="https://github.com/pyannote/pyannote-audio" target="_blank" rel="noopener">pyannote.audio</a> team:
-      pyannote segmentation-3.0 (MIT), <a href="https://github.com/wenet-e2e/wespeaker" target="_blank" rel="noopener">WeSpeaker</a>
-      ResNet34 speaker embeddings (<a href="https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM" target="_blank" rel="noopener">pyannote/wespeaker-voxceleb-resnet34-LM</a>),
-      and community-1 PLDA parameters; the embedding and PLDA models are licensed
-      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>
-      (<a href="https://huggingface.co/briox/diarization-js-community-1" target="_blank" rel="noopener">ONNX artifacts</a>).
-      Models run locally with ONNX Runtime Web; only model files are downloaded, never your audio.
-    </p>
+    <details class="credits">
+      <summary>Models, licenses and credits</summary>
+      <p class="footnote repo-link">
+        Speech-to-text with Whisper
+        <a href="https://huggingface.co/onnx-community/whisper-tiny.en_timestamped" target="_blank" rel="noopener">tiny.en</a>,
+        <a href="https://huggingface.co/onnx-community/whisper-base.en_timestamped" target="_blank" rel="noopener">base.en</a>, or
+        <a href="https://huggingface.co/onnx-community/whisper-small.en_timestamped" target="_blank" rel="noopener">small.en</a>
+        via <a href="https://github.com/huggingface/transformers.js" target="_blank" rel="noopener">Transformers.js</a>.
+        Speaker diarization with <a href="https://github.com/briox/diarization-js" target="_blank" rel="noopener">diarization-js</a>,
+        a port of <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noopener">pyannote speaker-diarization-community-1</a>
+        by the <a href="https://github.com/pyannote/pyannote-audio" target="_blank" rel="noopener">pyannote.audio</a> team:
+        pyannote segmentation-3.0 (MIT), <a href="https://github.com/wenet-e2e/wespeaker" target="_blank" rel="noopener">WeSpeaker</a>
+        ResNet34 speaker embeddings (<a href="https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM" target="_blank" rel="noopener">pyannote/wespeaker-voxceleb-resnet34-LM</a>),
+        and community-1 PLDA parameters; the embedding and PLDA models are licensed
+        <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>
+        (<a href="https://huggingface.co/briox/diarization-js-community-1" target="_blank" rel="noopener">ONNX artifacts</a>).
+        Models run locally with ONNX Runtime Web; only model files are downloaded, never your audio.
+      </p>
+    </details>
   </div>
 
   <script type="module" src="/src/main.js"></script>

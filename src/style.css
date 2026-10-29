@@ -1,210 +1,299 @@
-/* Tokens, typography, panels, buttons, meter, and progress track follow the
-   speech-ai-demo recognition page; additions are marked. */
+/* Visual language: neutral surfaces, one accent, 1px borders, small radii, and a
+   compact type scale — the plain "tool" look rather than a marketing page. The
+   token names --bg, --bar-bg, --accent and --chosen are read by the level meter
+   in audio.js, so they keep their names. */
 :root {
-  --bg: #0f1115;
-  --panel: #1a1e27;
-  --panel-2: #232936;
-  --text: #f2f5fa;
-  --muted: #9aa5b8;
-  --accent: #4da3ff;
-  --chosen: #ffd166;
-  --nontop: #e06cff;
-  --bar-bg: #2b3242;
-  --border: #2e3646;
+  color-scheme: dark light;
+
+  --bg: #0b0d11;
+  --surface: #13161c;
+  --surface-2: #191d25;
+  --surface-3: #212630;
+  --text: #e8ecf3;
+  --muted: #98a3b5;
+  --faint: #6f7a8b;
+  --border: #242a35;
+  --border-strong: #323a49;
+
+  --accent: #589bff;
+  --accent-hover: #74adff;
+  --accent-ink: #061120;
+  --accent-soft: rgba(88, 155, 255, 0.14);
+
+  --chosen: #f2c45a;
   --danger: #ff6b6b;
-  /* Added: extra speaker colors after accent / chosen / nontop. */
+  --ok: #5fd3a8;
+  --nontop: #d986ff;
+  --bar-bg: #1e232d;
+
+  /* Speaker colors, in the order speakers first appear. */
   --speaker-4: #5fd3a8;
   --speaker-5: #ff9f5a;
   --speaker-6: #b7c4ff;
-  color-scheme: dark;
+
+  --radius: 10px;
+  --radius-sm: 7px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f4f6f9;
+    --surface-3: #e9edf3;
+    --text: #141821;
+    --muted: #5b6676;
+    --faint: #7a8494;
+    --border: #e2e6ed;
+    --border-strong: #cfd6e0;
+
+    --accent: #1f6feb;
+    --accent-hover: #3b82f6;
+    --accent-ink: #ffffff;
+    --accent-soft: rgba(31, 111, 235, 0.1);
+
+    --chosen: #a9701a;
+    --danger: #c7382f;
+    --ok: #15803d;
+    --nontop: #9333ea;
+    --bar-bg: #e9edf3;
+
+    --speaker-4: #0f766e;
+    --speaker-5: #b45309;
+    --speaker-6: #4f46e5;
+
+    --shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  }
+}
+
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 20px;
-  line-height: 1.4;
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
-.wrap { max-width: 1400px; margin: 0 auto; padding: 32px 28px 70px; }
 
-h1 { font-size: 40px; margin: 0 0 4px; letter-spacing: -0.5px; }
-.subtitle { color: var(--muted); font-size: 20px; margin: 0 0 26px; }
+.app { max-width: 1180px; margin: 0 auto; padding: 28px 24px 48px; }
 
-/* Two equal columns (recognition | transcript); stacks under 900px. */
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 26px; align-items: start; }
+/* ---- Header ---- */
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
+  padding-bottom: 18px; margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.brand-mark {
+  flex: none;
+  display: grid; place-items: center;
+  width: 38px; height: 38px; border-radius: var(--radius-sm);
+  background: var(--accent-soft); color: var(--accent);
+}
+.brand-mark svg { width: 21px; height: 21px; }
+.brand-text { min-width: 0; }
+h1 { font-size: 18px; font-weight: 650; letter-spacing: -0.01em; margin: 0; }
+.tagline { color: var(--muted); font-size: 13.5px; margin: 2px 0 0; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin: 0; padding: 6px 11px;
+  font-size: 12.5px; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 999px; white-space: nowrap;
+}
+.chip svg { width: 13px; height: 13px; flex: none; }
+
+/* ---- Layout: a fixed control column beside the transcript, stacked on narrow screens ---- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 370px) minmax(0, 1fr);
+  gap: 18px; align-items: stretch;
+}
 @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
+.controls { display: flex; flex-direction: column; }
+/* Pinned to the foot of the column, so the eye always finds it in one place. */
+.controls .statusbar { margin-top: auto; }
+
 .panel {
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 22px;
-  margin-bottom: 22px;
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
 }
 
-/* Eyebrow / section labels (also used on headings, so reset heading weight). */
-label, .section-label {
-  display: block;
-  font-size: 15px;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--muted);
-  margin-bottom: 8px;
+/* ---- Eyebrow labels ---- */
+.label {
+  display: block; margin: 0 0 10px;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--faint);
 }
-.section-label { margin-top: 0; line-height: 1.4; }
-.section-label.mt { margin-top: 18px; }
 
-/* Buttons */
-.buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+/* Groups of related controls, separated by a hairline instead of whitespace alone. */
+.field { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); }
+
+/* ---- Buttons ---- */
+.buttons { display: flex; gap: 9px; flex-wrap: wrap; }
+.controls > .buttons { margin-bottom: 2px; }
 button {
-  font-size: 20px;
-  font-weight: 600;
-  font-family: inherit;
-  padding: 14px 22px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
+  font-size: 14px; font-weight: 550; font-family: inherit;
+  padding: 9px 15px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
   color: var(--text);
   cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
-button:hover:not(:disabled) { background: #2c3444; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #06121f; }
-button.primary:hover:not(:disabled) { background: #6bb4ff; }
-/* Live mic state: danger red so "we're recording" is unmistakable. */
-button.recording { background: var(--danger); border-color: var(--danger); color: #180606; }
-button.recording:hover:not(:disabled) { background: #ff8585; }
-button:disabled { opacity: 0.45; cursor: not-allowed; }
-/* Added: visible keyboard focus. */
+button:hover:not(:disabled) { background: var(--surface-3); border-color: var(--muted); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+/* Live mic state: red so "we're recording" is unmistakable. */
+button.recording { background: var(--danger); border-color: var(--danger); color: #fff; }
+button.recording:hover:not(:disabled) { background: #ff8585; border-color: #ff8585; }
+button:disabled { opacity: 0.42; cursor: not-allowed; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button.primary:focus-visible, button.recording:focus-visible { outline-color: var(--text); }
+.buttons.compact button { font-size: 13px; padding: 7px 12px; }
 
 /* A small pulsing dot in the status line while recording. */
 .rec-dot {
-  width: 12px; height: 12px; border-radius: 50%;
+  width: 8px; height: 8px; border-radius: 50%;
   background: var(--danger); display: inline-block; margin-right: 8px;
-  vertical-align: middle; animation: pulse 1s ease-in-out infinite;
+  vertical-align: middle; animation: pulse 1.2s ease-in-out infinite;
 }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-/* Added: text inputs share the reference select styling. */
-input[type="text"] {
-  width: 100%;
-  min-width: 0;
-  background: var(--panel-2);
+/* ---- Form controls ---- */
+input[type="text"], select {
+  width: 100%; min-width: 0;
+  background: var(--surface-2);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 18px;
-  font-family: inherit;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 14px; font-family: inherit;
 }
-input[type="text"]::placeholder { color: var(--muted); opacity: 1; }
-input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+input[type="text"]::placeholder { color: var(--faint); opacity: 1; }
+input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+select:disabled { opacity: 0.42; cursor: not-allowed; }
 
-/* Speech recognition model picker (reference select styling). */
-select {
-  width: 100%;
-  background: var(--panel-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  font-size: 18px;
-  font-family: inherit;
-}
-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-select:disabled { opacity: 0.45; cursor: not-allowed; }
-
-/* Added: speaker-detection checkbox row. */
-.check { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+.check { display: flex; align-items: center; gap: 10px; }
 .check input {
-  width: 22px; height: 22px; margin: 0; flex: none;
+  width: 17px; height: 17px; margin: 0; flex: none;
   accent-color: var(--accent); cursor: pointer;
 }
 .check input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.check input:disabled { opacity: 0.45; cursor: not-allowed; }
+.check input:disabled { opacity: 0.42; cursor: not-allowed; }
 .check label {
-  display: inline; margin: 0;
-  font-size: 20px; font-weight: 600; text-transform: none; letter-spacing: 0;
-  color: var(--text); cursor: pointer;
+  margin: 0; font-size: 14px; font-weight: 550; color: var(--text); cursor: pointer;
 }
-.check input:disabled + label { opacity: 0.45; cursor: not-allowed; }
+.check input:disabled + label { opacity: 0.42; cursor: not-allowed; }
 
-/* Added: explanatory helper text. */
-.helper { color: var(--muted); font-size: 16px; line-height: 1.5; margin: 12px 0 0; }
-.helper.flush { margin: 0 0 12px; }
+/* Explanatory copy: present, but never competing with the controls. */
+.helper { color: var(--faint); font-size: 12.5px; line-height: 1.5; margin: 9px 0 0; }
+.helper.flush { margin: 0 0 10px; }
 
-/* Model info block (monospace readout). */
-.model-line {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 15px; color: var(--muted);
-  background: var(--panel-2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 10px 14px; line-height: 1.5;
-  overflow-wrap: anywhere;
+/* ---- Mic meter: takes up space only while the mic is live ---- */
+.meter-wrap {
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin-top 0.25s ease;
 }
-.model-line + .model-line { margin-top: 8px; }
-/* Added: highlight the model in use; dim diarization while it is switched off. */
-.model-line.active { border-color: var(--accent); color: var(--text); }
-.model-line.off { opacity: 0.5; }
-/* Added: download state after the model details. */
-.model-state[data-state="queued"], .model-state[data-state="loading"] { color: var(--chosen); }
-.model-state[data-state="failed"] { color: var(--danger); }
-
-/* Progress bar (family track/fill). */
-.track {
-  position: relative;
-  background: var(--bar-bg); border-radius: 8px; height: 34px;
-  overflow: hidden; margin-top: 10px;
+.controls:has(#micBtn.recording) .meter-wrap { max-height: 90px; opacity: 1; margin-top: 14px; }
+/* Without :has() support the meter simply stays visible, as it was before. */
+@supports not selector(:has(*)) {
+  .meter-wrap { max-height: none; opacity: 1; margin-top: 14px; }
 }
-.fill {
-  height: 100%; width: 0; border-radius: 8px 0 0 8px;
-  background: linear-gradient(90deg, #3a72c9, var(--accent));
-  transition: width 0.35s ease; min-width: 2px;
-}
-/* Added: indeterminate state for steps that report no percentage. */
-.track.indeterminate .fill {
-  width: 35%; border-radius: 8px; transition: none;
-  animation: indeterminate 1.4s ease-in-out infinite;
-}
-@keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
-
-/* Status line */
-.status { min-height: 24px; color: var(--muted); font-size: 17px; margin-top: 16px; overflow-wrap: anywhere; }
-/* Added: focus target when the Retry button disappears; not interactive itself. */
-.status:focus { outline: none; }
-.status.error { color: var(--danger); }
-.status.warning { color: var(--chosen); }
-.meta-value { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--chosen); }
-
-/* Mic level meter (native canvas). */
-canvas { display: block; max-width: 100%; }
 .meter {
-  margin-top: 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   overflow: hidden;
   background: var(--bar-bg);
 }
-.meter canvas { width: 100%; height: 64px; }
+canvas { display: block; max-width: 100%; }
+.meter canvas { width: 100%; height: 56px; }
 
-/* Added: transcript panel. */
-.source-info { margin: 0 0 10px; color: var(--muted); font-size: 17px; overflow-wrap: anywhere; }
+/* ---- Model rows ---- */
+.model-line {
+  font-size: 12.5px; color: var(--muted);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 9px 12px; line-height: 1.5;
+  overflow-wrap: anywhere;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.model-line + .model-line { margin-top: 7px; }
+/* The model doing the work right now, and a dimmed one that is switched off. */
+.model-line.active { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
+.model-line.off { opacity: 0.5; }
+.model-state { font-weight: 600; }
+.model-state[data-state="queued"], .model-state[data-state="loading"] { color: var(--chosen); }
+.model-state[data-state="ready"] { color: var(--ok); }
+.model-state[data-state="failed"] { color: var(--danger); }
+
+/* ---- Status and progress ---- */
+.statusbar { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.track {
+  position: relative; overflow: hidden;
+  background: var(--bar-bg); border-radius: 999px; height: 6px;
+  margin-bottom: 11px;
+}
+.fill {
+  height: 100%; width: 0; border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.35s ease; min-width: 2px;
+}
+.track.indeterminate .fill {
+  width: 35%; transition: none;
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+@keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+
+.status { min-height: 20px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.status:focus { outline: none; }
+.status.error { color: var(--danger); }
+.status.warning { color: var(--chosen); }
+.meta-value { font-variant-numeric: tabular-nums; font-weight: 650; color: var(--text); }
+#retryRow { margin-top: 12px; }
+
+/* ---- Transcript panel ---- */
+.transcript-panel { display: flex; flex-direction: column; min-height: 440px; }
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  padding-bottom: 14px; margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-head .label { margin: 0; }
+
+.source { margin-top: 14px; }
+.source-info { margin: 0 0 9px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .source-info strong { color: var(--text); font-weight: 600; }
-audio { display: block; width: 100%; }
+audio { display: block; width: 100%; height: 34px; }
 
-.speaker-list { display: flex; flex-direction: column; gap: 10px; }
-.speaker-row { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); gap: 12px; align-items: center; }
-.speaker-row label { margin: 0; display: flex; align-items: center; gap: 10px; }
-.swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--spk, var(--muted)); }
+.speakers { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.speaker-list { display: flex; flex-direction: column; gap: 8px; }
+.speaker-row { display: grid; grid-template-columns: minmax(110px, auto) minmax(0, 1fr); gap: 10px; align-items: center; }
+.speaker-row label {
+  margin: 0; display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--muted);
+}
+/* A name field does not need the full column width. */
+.speaker-row input[type="text"] { max-width: 340px; }
+.swatch { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--spk, var(--muted)); }
 
 [data-color="0"] { --spk: var(--accent); }
 [data-color="1"] { --spk: var(--chosen); }
@@ -213,52 +302,78 @@ audio { display: block; width: 100%; }
 [data-color="4"] { --spk: var(--speaker-5); }
 [data-color="5"] { --spk: var(--speaker-6); }
 
+/* The empty state fills the panel so the column never looks abandoned. Its
+   waveform glyph is a background image because main.js rewrites the text. */
 .empty {
-  margin: 18px 0 0; padding: 18px;
-  color: var(--muted); font-size: 17px;
-  background: var(--panel-2); border: 1px dashed var(--border); border-radius: 10px;
+  flex: 1 1 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; margin: 0; padding: 32px 24px;
+  color: var(--faint); font-size: 13.5px; max-width: 42ch; align-self: center;
 }
-.turns { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+/* A pseudo-element, not a child: main.js rewrites this element's textContent,
+   which would delete any real node. The mask gives it the current text colour. */
+.empty::before {
+  content: ''; display: block;
+  width: 36px; height: 36px; margin-bottom: 14px;
+  background: currentColor; opacity: 0.55;
+  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round"><path d="M3 11v2M7 8v8M11 4v16M15 8v8M19 11v2"/></svg>') center / contain no-repeat;
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.5" stroke-linecap="round"><path d="M3 11v2M7 8v8M11 4v16M15 8v8M19 11v2"/></svg>') center / contain no-repeat;
+}
+
+/* ---- Turns ---- */
+.turns {
+  list-style: none; margin: 14px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 7px;
+  /* Long recordings run to hundreds of turns; keep the panel's head reachable. */
+  max-height: min(68vh, 760px); overflow-y: auto;
+  scrollbar-width: thin;
+}
 .turn {
-  background: var(--panel-2);
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--spk, var(--border));
-  border-radius: 10px;
-  padding: 12px 16px;
+  border-left: 3px solid var(--spk, var(--border-strong));
+  border-radius: var(--radius-sm);
+  padding: 10px 13px;
 }
-.turn-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 15px; }
-.turn-speaker { font-weight: 700; color: var(--spk, var(--text)); overflow-wrap: anywhere; }
-.turn-speaker.unknown { color: var(--muted); font-style: italic; font-weight: 600; }
+.turn-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 12px; }
+.turn-speaker { font-weight: 650; color: var(--spk, var(--text)); overflow-wrap: anywhere; }
+.turn-speaker.unknown { color: var(--faint); font-style: italic; font-weight: 600; }
 .turn-time {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  color: var(--muted); font-variant-numeric: tabular-nums;
+  color: var(--faint); font-variant-numeric: tabular-nums; font-size: 11.5px;
 }
-.turn-text { margin: 4px 0 0; overflow-wrap: anywhere; }
+.turn-text { margin: 3px 0 0; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
 
-/* Footer */
-.footnote { margin-top: 30px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+/* ---- Credits ---- */
+.credits { margin-top: 20px; }
+.credits summary {
+  cursor: pointer; width: fit-content;
+  font-size: 12.5px; color: var(--muted);
+  padding: 5px 2px;
+}
+.credits summary:hover { color: var(--text); }
+.credits summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.footnote { margin: 6px 0 0; color: var(--faint); font-size: 12px; line-height: 1.65; max-width: 90ch; }
 .footnote a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
 .footnote a:hover { color: var(--accent); }
-.repo-link { margin-top: 14px; }
 
-/* Added: phone layout. */
+/* ---- Narrow screens ---- */
 @media (max-width: 600px) {
-  body { font-size: 18px; }
-  .wrap { padding: 20px 16px 48px; }
-  h1 { font-size: 30px; }
-  .subtitle { font-size: 17px; margin-bottom: 20px; }
-  .panel { padding: 16px; }
-  .buttons { gap: 10px; }
+  .app { padding: 20px 16px 36px; }
+  .app-header { gap: 12px; }
+  .layout { gap: 14px; }
+  .panel { padding: 15px; }
   .buttons button { flex: 1 1 auto; }
-  button { font-size: 18px; padding: 12px 16px; }
-  /* 16px keeps iOS from zooming in when the select gets focus. */
-  select { font-size: 16px; padding: 10px 12px; }
-  .check label { font-size: 18px; }
-  .speaker-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  /* 16px keeps iOS from zooming in when a field gets focus. */
+  input[type="text"], select { font-size: 16px; }
+  .speaker-row { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+  .speaker-row input[type="text"] { max-width: none; }
+  .transcript-panel { min-height: 320px; }
+  .turns { max-height: none; overflow-y: visible; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
   .rec-dot { animation: none; }
-  .fill { transition: none; }
   .track.indeterminate .fill { animation: none; width: 100%; opacity: 0.5; }
 }
