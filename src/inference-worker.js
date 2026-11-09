@@ -5,7 +5,13 @@ import { env, pipeline } from '@huggingface/transformers';
 import * as ort from 'onnxruntime-web';
 import { DiarizationPipeline } from 'diarization-js';
 import ortWasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm?url';
-import { DEFAULT_ASR_MODEL, getAsrModel } from './asr-models.js';
+import { asrVariant, DEFAULT_ASR_MODEL, getAsrModel } from './asr-models.js';
+import {
+  detectBackend,
+  diarizationExecutionProviders,
+  parseBackendOverride,
+  segmentationBatchSize,
+} from './backend.js';
 import {
   ASR_CHUNK_OPTIONS,
   asrWindowCount,
@@ -26,6 +32,27 @@ import {
 ort.env.wasm.wasmPaths = { wasm: ortWasmUrl };
 env.allowLocalModels = false;
 
+// Settled once, before any model loads. The same local WASM file carries the
+// WebGPU provider: it is the `jsep` build, which is why the GPU needs no extra
+// runtime file.
+const backendPromise = detectBackend({
+  override: parseBackendOverride(self.location?.search),
+  requestAdapter: navigator.gpu ? () => navigator.gpu.requestAdapter() : null,
+}).then((choice) => {
+  for (const model of ['asr', 'diarization']) postBackend(model, choice.backend, choice.reason);
+  return choice.backend;
+});
+
+// The provider Whisper loads on. It is the detected one until a WebGPU load or
+// a WebGPU run fails, and then it is WASM for the life of the worker: a GPU
+// that cannot run this model will not start working later, and WASM always can.
+let asrBackend = null;
+
+async function currentAsrBackend() {
+  asrBackend ??= await backendPromise;
+  return asrBackend;
+}
+
 const DIARIZATION_BASE_URL =
   'https://huggingface.co/briox/diarization-js-community-1/resolve/7f02c43a14eff6d4dea0a4f8099f1ca48eb163b8/';
 const DIARIZATION_FILES = {
@@ -43,6 +70,14 @@ function errorText(error) {
 }
 
 /**
+ * Tell the page which execution provider one pipeline runs on. Sent once per
+ * pipeline after detection, and again for `asr` if it falls back to the CPU.
+ */
+function postBackend(model, backend, reason) {
+  self.postMessage({ type: 'backend', model, backend, reason });
+}
+
+/**
  * Tell the page the state of a model load, whatever request started it:
  * `{type: 'model', model: 'asr'|'diarization', asrModel?, state: 'loading'|'ready'|'failed', progress?}`.
  */
@@ -54,11 +89,15 @@ function postModelState(model, asrModel, state, progress) {
 }
 
 // Only one Whisper model is kept loaded: the one the last request used.
-// The slot key is a key of ASR_MODELS. Disposing a model frees its memory
-// only; its files stay in the Transformers.js browser cache.
+// The slot key is `<key of ASR_MODELS>|<backend>`, because the two providers
+// load different weights, so a change of provider reloads the model the same
+// way a change of model does. Disposing a model frees its memory only; its
+// files stay in the Transformers.js browser cache.
 const asrSlot = createModelSlot({
-  load(key, report) {
+  load(slotKey, report) {
+    const [key, backend] = slotKey.split('|');
     const model = getAsrModel(key);
+    const { dtype, bytes } = asrVariant(key, backend);
     const message = `Downloading the ${model.label} speech recognition model`;
     const onFraction = (fraction) => {
       report('asr-load', message, fraction);
@@ -66,11 +105,11 @@ const asrSlot = createModelSlot({
     };
     onFraction(0);
     // Stay a little below the file total so the bar can reach 100%.
-    const expectedBytes = Math.floor(model.bytes * 0.999);
+    const expectedBytes = Math.floor(bytes * 0.999);
     return pipeline('automatic-speech-recognition', model.repo, {
       revision: model.revision,
-      device: 'wasm',
-      dtype: 'q8',
+      device: backend,
+      dtype,
       progress_callback: transformersProgressHandler(createByteProgress(expectedBytes, onFraction)),
     }).then((asr) => {
       postModelState('asr', key, 'ready');
@@ -84,10 +123,32 @@ const asrSlot = createModelSlot({
   dispose: (asr) => asr.dispose(),
 });
 
-/** The Whisper model for a key (no key: the default). An unknown key throws before the loaded model is disposed. */
-function loadAsr(key = DEFAULT_ASR_MODEL, report) {
+/**
+ * The Whisper model for a key (no key: the default). An unknown key throws
+ * before the loaded model is disposed. A WebGPU load that fails is not the
+ * user's problem to solve: the worker drops to the CPU weights and loads those
+ * instead, and only a second failure is reported.
+ */
+async function loadAsr(key = DEFAULT_ASR_MODEL, report) {
   getAsrModel(key);
-  return asrSlot(key, report);
+  const backend = await currentAsrBackend();
+  try {
+    return await asrSlot(`${key}|${backend}`, report);
+  } catch (error) {
+    if (backend !== 'webgpu') throw error;
+    demoteAsrToWasm('the speech recognition model could not load on the GPU');
+    return asrSlot(`${key}|${asrBackend}`, report);
+  }
+}
+
+/**
+ * Move Whisper to the CPU for good. The next `loadAsr` asks the slot for a
+ * different key, so the slot disposes the GPU model before loading the CPU one.
+ */
+function demoteAsrToWasm(reason) {
+  if (asrBackend === 'wasm') return;
+  asrBackend = 'wasm';
+  postBackend('asr', 'wasm', reason);
 }
 
 async function openArtifactCache() {
@@ -128,14 +189,16 @@ async function createDiarizer(report) {
   );
   report('diarization-load', 'Preparing the speaker detection models');
   postModelState('diarization', null, 'loading');
+  // The same model files run on either provider, so the backend changes no
+  // download.
+  const backend = await backendPromise;
   return DiarizationPipeline.create({
     ort,
     segmentationModel,
     embeddingModel,
     pldaParamsJson: JSON.parse(new TextDecoder().decode(pldaBytes)),
-    executionProviders: ['wasm'],
-    // A smaller batch than the WebGPU-tuned default keeps WASM memory use low.
-    segmentationBatchSize: 8,
+    executionProviders: diarizationExecutionProviders(backend),
+    segmentationBatchSize: segmentationBatchSize(backend),
     // diarization-js zero-pads each embedding batch to its longest crop, and
     // the padding changes the embeddings. In browser tests on a two-speaker
     // sample, batch 8 merged both speakers into one; batch 1 (no padding) gave
@@ -203,6 +266,10 @@ function createBackend(report, asrModelKey) {
         const output = await asr(audio, { return_timestamps: 'word', ...ASR_CHUNK_OPTIONS, streamer });
         return output.chunks ?? [];
       } catch (error) {
+        // A GPU that fails mid-run will fail the same way again, so the next
+        // attempt uses the CPU weights. The retry is the user's, so one failed
+        // request never silently starts a second model download.
+        if (asrBackend === 'webgpu') demoteAsrToWasm('the GPU could not run the speech recognition model');
         throw new Error(`Transcription failed (${errorText(error)}). Try again.`);
       }
     },

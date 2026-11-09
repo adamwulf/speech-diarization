@@ -26,7 +26,12 @@
           <button type="button" class="primary" id="micBtn">Start recording</button>
           <button type="button" id="fileBtn">Transcribe file…</button>
           <!-- Hidden picker; fileBtn opens it. Any audio, or video with an audio track, that the browser can decode (m4a, mp3, wav, mp4…). -->
-          <input type="file" id="fileInput" accept="audio/*,video/*" hidden />
+          <!-- The wildcards cover most systems; the extensions are for the ones where a
+               type is not registered (notably .m4a on Windows), which otherwise greys the
+               file out in the picker. -->
+          <input type="file" id="fileInput"
+            accept="audio/*,video/*,.m4a,.m4b,.mp4,.m4v,.mov,.mp3,.wav,.aac,.caf,.amr,.3gp,.ogg,.oga,.opus,.flac,.webm,.mkv"
+            hidden />
         </div>
         <p class="helper">
           Record, then click “Stop recording” to transcribe — or pick an audio or video file.
@@ -60,7 +65,7 @@
 
         <h3 class="section-label mt">Models</h3>
         <div class="model-line" id="asrModel"><span id="asrModelInfo">Whisper tiny.en · speech-to-text · ~44 MB · runs locally</span><span class="model-state" id="asrModelState"></span></div>
-        <div class="model-line" id="diarModel">pyannote + WeSpeaker · speaker diarization · ~34 MB · runs locally<span class="model-state" id="diarModelState"></span></div>
+        <div class="model-line" id="diarModel"><span id="diarModelInfo">pyannote + WeSpeaker · speaker diarization · ~34 MB · runs locally</span><span class="model-state" id="diarModelState"></span></div>
         <div class="track" id="track" role="progressbar" aria-label="Task progress" aria-valuemin="0" aria-valuemax="100" hidden>
           <div class="fill" id="fill"></div>
         </div>

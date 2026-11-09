@@ -82,7 +82,8 @@ async function decodeMp4Fallback(blob, onProgress) {
     audio = await mp4.decodeMp4AudioTrack(blob, movie.audio, TARGET_SAMPLE_RATE, { onProgress });
   } catch (cause) {
     const detail = cause?.message ? ` (${cause.message})` : '';
-    throw new UserFacingError(`The audio track could not be decoded${detail}. Try converting the file to MP3 or WAV.`, { cause });
+    throw new UserFacingError(`This browser could not decode this file's audio track${detail}. `
+      + 'Converting the file to WAV or MP3 will let it through.', { cause });
   }
   if (!audio) {
     throw new UserFacingError(`This browser can’t decode the audio in this file (${movie.audio.codec}). Try a current version of Chrome or Edge, or convert the file to MP3 or WAV.`);

@@ -71,17 +71,20 @@ Create the worker with
 
 ## Models
 
-| Use | Source | Download |
+| Use | Source | Download (WASM / WebGPU) |
 |---|---|---|
-| ASR `tiny.en` (default) | `onnx-community/whisper-tiny.en_timestamped` at revision `aeaa1376…` | 43.5 MB, Transformers.js browser cache |
-| ASR `base.en` | `onnx-community/whisper-base.en_timestamped` at revision `fa239a41…` | 79.6 MB, Transformers.js browser cache |
-| ASR `small.en` | `onnx-community/whisper-small.en_timestamped` at revision `80853938…` | 251.7 MB, Transformers.js browser cache |
+| ASR `tiny.en` (default) | `onnx-community/whisper-tiny.en_timestamped` at revision `aeaa1376…` | 43.5 MB / 95.2 MB, Transformers.js browser cache |
+| ASR `base.en` | `onnx-community/whisper-base.en_timestamped` at revision `fa239a41…` | 79.6 MB / 189.8 MB, Transformers.js browser cache |
+| ASR `small.en` | `onnx-community/whisper-small.en_timestamped` at revision `80853938…` | 251.7 MB / 664.0 MB, Transformers.js browser cache |
 | Diarization | `diarization-js@0.1.0` with `briox/diarization-js-community-1` at revision `7f02c43a…` | 33.5 MB, Cache API `diarization-js-community-1` |
 
-- All ASR models load with `dtype: 'q8'` and `device: 'wasm'`. The download is
-  `encoder_model_quantized.onnx`, `decoder_model_merged_quantized.onnx`, and the config
-  and tokenizer files. Each `_timestamped` export has `alignment_heads` in its
-  `generation_config.json`.
+- On WASM an ASR model loads with `dtype: 'q8'`: `encoder_model_quantized.onnx`,
+  `decoder_model_merged_quantized.onnx`, and the config and tokenizer files. On WebGPU it
+  loads `encoder_model.onnx` and `decoder_model_merged_fp16.onnx` with the same config
+  and tokenizer files, so the download is roughly twice as large (95, 190, and 664 MB
+  against 44, 80, and 252 MB). Each `_timestamped` export has `alignment_heads` in its
+  `generation_config.json`, and the word timestamps come out of the same cross-attention
+  outputs on both providers.
 - The `_timestamped` export has the cross-attention outputs that word timestamps need.
   Do not pass `language` or `task`: Transformers.js 3.8.1 throws for English-only models.
 - The browser checks below used only `tiny.en`. `base.en` and `small.en` use the same
@@ -111,13 +114,40 @@ Create the worker with
   1.22.0 glue code with the matching local WASM, and there is no CDN request for runtime
   files. The URL comes from a relative `?url` import because the `onnxruntime-web`
   exports map does not expose `dist/`.
-- Both sessions use the WASM execution provider. Without cross-origin isolation, ORT
-  uses one thread.
-- `segmentationBatchSize: 8` keeps WASM memory low. `embeddingBatchSize: 1`:
-  diarization-js zero-pads each embedding batch to its longest crop, and the padding
-  changes the embeddings. On the two-speaker pyannote sample, batch 8 merged both
-  speakers into one. In that test, batch 1 (no padding) found both speakers and was also
-  faster than the larger batches.
+- Without cross-origin isolation, the WASM provider uses one thread.
+- `src/backend.js` picks the provider once per worker, before any model loads, and the
+  worker posts it as `{type: 'backend'}`. WebGPU needs `navigator.gpu.requestAdapter()`
+  to return an adapter; a missing `navigator.gpu`, a null adapter, and a rejection all
+  fall back to WASM. The check has to come first because Transformers.js throws
+  `Unsupported device` for a WebGPU request in a browser without WebGPU.
+  `?backend=webgpu|wasm` on the worker URL forces one provider; the page never sets it,
+  so the app always detects.
+- The diarization sessions use `['webgpu', 'wasm']` on a machine with a GPU: ORT assigns
+  an operator that the WebGPU provider does not implement to WASM instead of failing the
+  session. The segmentation and embedding files are the same fp32 ONNX on both providers,
+  so the provider changes no download.
+- No extra runtime file is needed for WebGPU: the local WASM the worker already points
+  ORT at is the `jsep` build, which carries the WebGPU provider.
+- Whisper also runs on WebGPU, but not with the WASM weights: `BACKEND_VARIANTS` in
+  `src/asr-models.js` gives WASM `q8` and WebGPU an fp32 encoder with an fp16 merged
+  decoder. q8 on WebGPU is 18x slower and returns nonsense, and an fp16 encoder
+  degenerates into a repetition loop; the measurements are below.
+- Because the weights differ, the ASR model slot is keyed `<model>|<backend>`, so a
+  change of provider reloads the model the same way a change of model does, and each
+  model carries both download sizes (`wasmBytes`, `webgpuBytes`) for the page and the
+  progress bar.
+- A WebGPU Whisper load that fails is retried once on WASM, and a WebGPU run that fails
+  demotes Whisper to WASM as well; either way the worker posts a second
+  `{type: 'backend', model: 'asr'}`. The demotion lasts for the life of the worker, since
+  a GPU that cannot run this model will not start working later. A failed run is not
+  re-run automatically: the user's Retry does it, so one failure never silently starts a
+  second model download. Diarization is not demoted with it.
+- `segmentationBatchSize` is 32 on WebGPU (the diarization-js default, which keeps the
+  GPU busy) and 8 on WASM, where a batch that large only grows the heap.
+  `embeddingBatchSize: 1` on both: diarization-js zero-pads each embedding batch to its
+  longest crop, and the padding changes the embeddings. On the two-speaker pyannote
+  sample, batch 8 merged both speakers into one. In that test, batch 1 (no padding) found
+  both speakers and was also faster than the larger batches.
 - Vite prints "Module node:fs/promises has been externalized" for diarization-js
   `artifacts.js`. Those imports are only in its Node code path; the warning is harmless.
 
@@ -209,3 +239,129 @@ because Whisper output depends on the window context.
 
 Known limit: after long silence, Whisper can put the first word's start too early
 (for example 0.0 s when speech starts at 6.7 s). The timestamps stay valid.
+
+## WebGPU: what was measured
+
+One machine, so these are not general numbers. They are the evidence for the provider
+choices above.
+
+Conditions: Chrome (headless) on Windows 11, Intel Xe-LPG integrated GPU (`shader-f16`
+present), no cross-origin isolation, so the WASM provider has one thread. Fixture:
+pyannote `sample.wav`, 30 s, two speakers, `speakers: true`, model `tiny.en` unless
+noted. Models were already downloaded, so no time below includes a download.
+
+"cold" is the first transcription in a page and "warm" is the second. The first one
+compiles the WebGPU shaders, which a user pays once per page, so warm is what a user sees
+from the second transcription on. The difference is large, and reading cold numbers as
+steady state is what first made WebGPU look slower than it is: `tiny.en` ASR measured
+11.4 s cold against 7.5 s warm. Times are the `asr` and `diarization` stages, in ms.
+
+### The result
+
+| Provider | ASR | Diarization | Total | Words |
+|---|---|---|---|---|
+| WASM, q8 | 8130 | 28668 | 36803 | 76 |
+| WebGPU, fp32 encoder + fp16 decoder (warm) | 7460 | 4688 | 12154 | 76 |
+
+Identical output: the same 76 words, with the same speaker on every one of them. On
+`jfk.wav` (11 s, one speaker) the run went from 7798 ms to 2770 ms warm, also with the
+same 22 words. On `base.en` the WASM run was 52.7 s and 50.9 s over two reps against
+9.5 s to 15.2 s on WebGPU.
+
+Diarization is the larger part of that: it is the same model files on either provider,
+and it went from 28.7 s to 4.7 s here, and from 36.5 s to 3.0 s on `base.en`.
+
+### Whisper: the q8 weights must not go to WebGPU
+
+Switching only `device` to `webgpu` and keeping `dtype: 'q8'` was 18x slower *and* wrong:
+92.7 s of ASR on the 11 s `jfk.wav`, and the text came back as nonsense ("proc bicy at
+fare Twilight ...") instead of the sentence. The integer matrix operators that q8 needs
+are not WebGPU operators, so each one copies tensors back to the CPU.
+
+### The encoder has to be fp32
+
+Per-file `dtype` combinations on `sample.wav` (cold, one run each):
+
+| Encoder | Merged decoder | ASR | Words | Transcript |
+|---|---|---|---|---|
+| fp16 | q4f16 | 32721 | 298 | breaks: repeats ">> Hello." for the whole clip |
+| fp16 | q4 | 28086 | 298 | breaks the same way |
+| fp32 | q4 | 9650 | 72 | content right, "I heard of deep" for "I heard a beat" |
+| fp32 | q4f16 | 11518 | 72 | content right, same slip |
+| fp32 | fp16 | 11361 | 76 | matches the WASM transcript exactly |
+
+The encoder's precision decides it: every fp16 encoder degenerated into a repetition loop
+and lost the conversation, and every fp32 encoder kept it. Among the fp32 rows the fp16
+decoder is the one that matched WASM word for word, so that is the pair the app uses, and
+the cost is the download: ~95, ~190, and ~664 MB against ~44, ~80, and ~252 MB for q8.
+
+A single `dtype: 'q4f16'` string cannot be used at all. It asks for
+`encoder_model_q4f16.onnx`, which these repositories do not have (the encoder ships
+`_fp16`), and the load then fails with `Unsupported model type: whisper` — which is the
+*second* attempt of the ASR pipeline (`AutoModelForCTC`) reporting itself, not the real
+cause. Transformers.js swallows the first attempt's error, so a missing file for a
+seq2seq model always surfaces under that misleading message.
+
+### Long audio and small.en on WebGPU
+
+The chunk stitching that `chunk_length_s: 30, stride_length_s: 5` needs was checked on
+WebGPU too, because it is more than one `generate()` call and the fp16 decoder could have
+moved the word timestamps at a seam. `ted_60_16k.wav` (60.0 s, one speaker, so the ASR
+windows start every 20 s and the seams are 20-30 s and 40-50 s), warm:
+
+| Provider | ASR | Diarization | Words | Last word |
+|---|---|---|---|---|
+| WASM q8 | 19959 | ~45000 | 186 | " it" ends 60.00 |
+| WebGPU fp32 + fp16 | 20207 | 9507 | 186 | " up" ends 60.00 |
+
+The same 186 words on both. On both: every word finite with `0 <= start < end <=
+duration`, starts never decreasing, no 3-word group repeated back to back, and one
+speaker plus a few nulls. Across both seams the words match except that the WebGPU run
+read two of them better ("things stay civil" for "things taste civil", "But then came my
+90-page" for "But then it came my"). Note that ASR was no faster here (20.2 s against
+20.0 s): on this fixture the GPU gain is all in diarization.
+
+`small.en` on WebGPU was run once on `sample.wav`, warm: ASR 23476 ms, diarization
+6078 ms, 80 words, and the best transcript of any run here ("I heard a beep", "Sheila in
+Texas", both of which every other model missed). Its 664 MB loaded on this iGPU without
+hitting a memory limit.
+
+### The fallback was exercised, not just written
+
+With a fault injected into the WebGPU branch of the ASR load, the worker posted
+`asr=webgpu`, then `asr=wasm (the speech recognition model could not load on the GPU)`,
+and the transcription finished correctly on WASM. Diarization stayed on WebGPU, as
+intended.
+
+That path also covers a GPU without `shader-f16`: Transformers.js 3.8.1 *throws*
+`The device (webgpu) does not support fp16.` for an fp16 file on such an adapter
+(`models.js`, next to `isWebGpuFp16Supported`), rather than warning and continuing. So an
+older Intel, AMD, or Android GPU transcribes on the CPU and still detects speakers on the
+GPU, with the model line saying so. With Chrome started as `--disable-features=WebGPU,WebGPUService`,
+`requestAdapter()` returns null, both pipelines report `wasm`, and the page shows the q8
+sizes (44, 80, 252 MB) and "runs locally on the CPU" on both model lines.
+
+### Caveats
+
+- One GPU (Intel Xe-LPG) and one browser. Apple GPUs on macOS are untested. This is the
+  gap that matters most: the fallback catches a provider that *throws*, and it cannot
+  catch one that returns wrong output, which is exactly what q8 and an fp16 encoder did
+  here. Run `sample.wav` on a Mac in Safari 26 or Chrome before relying on it, and look
+  for a repeated phrase in place of the conversation. If that appears,
+  `BACKEND_VARIANTS.webgpu.dtype` in `src/asr-models.js` is the one place to change (an
+  fp32 decoder would be the safe pair, at ~154 MB for tiny.en).
+- Repeated runs drift: an identical WASM configuration measured 8130 ms and 11725 ms of
+  ASR at different points, because sustained load on a laptop throttles. Treat anything
+  under about 1.5x as noise; the diarization result is far above that.
+- Browsers without WebGPU (Safari before 26, Firefox without WebGPU in workers) take the
+  WASM path, which is what the app did everywhere before this change.
+- Transformers.js sets `ort.env.webgpu.powerPreference = 'high-performance'` when it is
+  imported, and nothing here changes it, so a laptop with both a discrete and an
+  integrated GPU uses the discrete one. `'low-power'` would pin it to the integrated GPU
+  and draw less battery, at the cost of speed on those machines.
+
+The harness is `bench/` (not committed): `bench.html` and `bench.js` time a cold and a
+warm transcribe+diarize run on a chosen provider and leave the result on `window.__bench`,
+and `run-bench.mjs` drives it in real Chrome through Playwright's `channel: 'chrome'` and
+writes `bench/out/<backend>-<fixture>-<model>.json`. `?backend=` on the worker URL is
+what picks the provider; `bench.js` passes it, the app never does.
