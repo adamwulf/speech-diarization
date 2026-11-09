@@ -317,9 +317,9 @@ function renderModelState(element, entry) {
  * "runs locally", because that part is true on either one.
  */
 function runsWhere(backend) {
-  if (backend === 'webgpu') return 'runs locally on the GPU';
-  if (backend === 'wasm') return 'runs locally on the CPU';
-  return 'runs locally';
+  if (backend === 'webgpu') return ' · GPU';
+  if (backend === 'wasm') return ' · CPU';
+  return '';
 }
 
 /**
@@ -329,18 +329,17 @@ function runsWhere(backend) {
  */
 function renderModelOptions() {
   for (const option of asrModelSelect.options) {
-    const model = getAsrModel(option.value);
-    const { bytes } = asrVariant(option.value, state.backends.asr);
-    // Short text, so it fits a phone-width select; the model line shows the full name.
-    option.textContent = `${model.level} — ${option.value} (${downloadSize(bytes)})`;
+    // The level alone. The row under the select carries the model and its size,
+    // so the choice does not need to restate them.
+    option.textContent = getAsrModel(option.value).level;
   }
 }
 
 function renderModelLines() {
   const model = getAsrModel(asrModelSelect.value);
   const { bytes } = asrVariant(asrModelSelect.value, state.backends.asr);
-  asrModelInfo.textContent = `${model.label} · speech-to-text · ${downloadSize(bytes)} · ${runsWhere(state.backends.asr)}`;
-  diarModelInfo.textContent = `pyannote + WeSpeaker · speaker diarization · ~34 MB · ${runsWhere(state.backends.diarization)}`;
+  asrModelInfo.textContent = `${model.label} · ${downloadSize(bytes)}${runsWhere(state.backends.asr)}`;
+  diarModelInfo.textContent = `pyannote + WeSpeaker · ~34 MB${runsWhere(state.backends.diarization)}`;
   renderModelState(asrModelState, state.models.asr.get(asrModelSelect.value));
   renderModelState(diarModelState, state.models.diarization);
 }
@@ -376,7 +375,6 @@ function handleModelState(message) {
 function handleBackend(message) {
   if (!Object.hasOwn(state.backends, message.model)) return;
   state.backends[message.model] = message.backend;
-  if (message.model === 'asr') renderModelOptions();
   renderModelLines();
 }
 
@@ -526,9 +524,7 @@ function renderTranscript() {
   transcriptList.replaceChildren(items);
   transcriptList.hidden = !hasTurns;
   transcriptEmpty.hidden = hasTurns;
-  transcriptEmpty.textContent = state.source
-    ? 'No speech was detected in this audio.'
-    : 'No transcript yet. Record or choose an audio or video file to get started.';
+  transcriptEmpty.textContent = state.source ? 'No speech detected' : 'No transcript yet';
 }
 
 function render() {
@@ -550,9 +546,7 @@ function setDoneStatus(warning) {
     ), { tone: 'warning' });
     return;
   }
-  const done = speakersDetected()
-    ? `Done — ${plural(count, 'speaker')} detected. Rename speakers or export the transcript.`
-    : 'Done. Export the transcript below.';
+  const done = speakersDetected() ? `Done — ${plural(count, 'speaker')}` : 'Done';
   setStatus(sentences(done, warning), { tone: warning ? 'warning' : 'info' });
 }
 
@@ -641,7 +635,7 @@ async function transcribe(candidate) {
   setRetry(null);
   updateControls();
   setProgress('indeterminate');
-  setStatus(`Preparing to transcribe ${formatClock(candidate.duration)} of audio…`);
+  setStatus(`Preparing — ${formatClock(candidate.duration)}…`);
 
   let result;
   try {
@@ -837,7 +831,7 @@ clearBtn.addEventListener('click', () => {
   state.speakerNames = new Map();
   setRetry(null);
   render();
-  setStatus('Cleared. Click “Start recording”, or transcribe an audio or video file.');
+  setStatus('Cleared');
 });
 
 retryBtn.addEventListener('click', () => {

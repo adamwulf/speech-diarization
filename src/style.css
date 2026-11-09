@@ -1,210 +1,242 @@
-/* Tokens, typography, panels, buttons, meter, and progress track follow the
-   speech-ai-demo recognition page; additions are marked. */
+/* Neutral greys, one restrained accent, small radii, and hairlines instead of
+   nested boxes. The token names --bg, --bar-bg, --accent and --chosen are read
+   by the level meter in audio.js, so they keep their names. */
 :root {
-  --bg: #0f1115;
-  --panel: #1a1e27;
-  --panel-2: #232936;
-  --text: #f2f5fa;
-  --muted: #9aa5b8;
-  --accent: #4da3ff;
-  --chosen: #ffd166;
-  --nontop: #e06cff;
-  --bar-bg: #2b3242;
-  --border: #2e3646;
-  --danger: #ff6b6b;
-  /* Added: extra speaker colors after accent / chosen / nontop. */
-  --speaker-4: #5fd3a8;
-  --speaker-5: #ff9f5a;
-  --speaker-6: #b7c4ff;
-  color-scheme: dark;
+  color-scheme: dark light;
+
+  --bg: #0d0d0e;
+  --surface: #151517;
+  --surface-2: #1c1c1f;
+  --surface-3: #232327;
+  --text: #ececee;
+  --muted: #9d9da3;
+  --faint: #74747b;
+  --border: #252528;
+  --border-strong: #35353a;
+
+  /* Used for focus, the progress bar and the first speaker — nothing else. */
+  --accent: #7d9bd1;
+  --accent-ink: #0d0d0e;
+
+  --chosen: #cfa65f;
+  --danger: #d9655f;
+  --ok: #6fa98a;
+  --nontop: #a98cc4;
+  --bar-bg: #1f1f23;
+
+  /* Speaker colours, in the order speakers first appear. */
+  --speaker-4: #6fa98a;
+  --speaker-5: #c68a63;
+  --speaker-6: #8e9bc4;
+
+  --radius: 6px;
+  --radius-sm: 5px;
 }
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #fbfbfa;
+    --surface: #ffffff;
+    --surface-2: #f5f5f4;
+    --surface-3: #ebebe9;
+    --text: #1b1b1a;
+    --muted: #5f5f5c;
+    --faint: #85857f;
+    --border: #e4e4e1;
+    --border-strong: #cfcfca;
+
+    --accent: #3f5f99;
+    --accent-ink: #ffffff;
+
+    --chosen: #8a6418;
+    --danger: #a93a33;
+    --ok: #2f6b4f;
+    --nontop: #6d4e91;
+    --bar-bg: #e9e9e6;
+
+    --speaker-4: #2f6b4f;
+    --speaker-5: #8a5223;
+    --speaker-6: #434f80;
+  }
+}
+
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 20px;
-  line-height: 1.4;
+  font-size: 15px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
-.wrap { max-width: 1400px; margin: 0 auto; padding: 32px 28px 70px; }
 
-h1 { font-size: 40px; margin: 0 0 4px; letter-spacing: -0.5px; }
-.subtitle { color: var(--muted); font-size: 20px; margin: 0 0 26px; }
+.app { max-width: 1140px; margin: 0 auto; padding: 32px 24px 48px; }
 
-/* Two equal columns (recognition | transcript); stacks under 900px. */
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 26px; align-items: start; }
+/* ---- Header ---- */
+.app-header { margin-bottom: 22px; }
+h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.005em; margin: 0; }
+.tagline { color: var(--faint); font-size: 13px; margin: 3px 0 0; }
+
+/* ---- Layout ---- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 330px) minmax(0, 1fr);
+  gap: 16px; align-items: start;
+}
 @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
 .panel {
-  background: var(--panel);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 22px;
-  margin-bottom: 22px;
+  border-radius: var(--radius);
+  padding: 16px;
 }
 
-/* Eyebrow / section labels (also used on headings, so reset heading weight). */
-label, .section-label {
-  display: block;
-  font-size: 15px;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--muted);
-  margin-bottom: 8px;
+/* ---- Eyebrow labels ---- */
+.label {
+  display: block; margin: 0 0 10px;
+  font-size: 10.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--faint);
 }
-.section-label { margin-top: 0; line-height: 1.4; }
-.section-label.mt { margin-top: 18px; }
 
-/* Buttons */
-.buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+.field { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+/* ---- Buttons ---- */
+.buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 button {
-  font-size: 20px;
-  font-weight: 600;
-  font-family: inherit;
-  padding: 14px 22px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--panel-2);
+  font-size: 13.5px; font-weight: 500; font-family: inherit;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: transparent;
   color: var(--text);
   cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
-button:hover:not(:disabled) { background: #2c3444; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #06121f; }
-button.primary:hover:not(:disabled) { background: #6bb4ff; }
-/* Live mic state: danger red so "we're recording" is unmistakable. */
-button.recording { background: var(--danger); border-color: var(--danger); color: #180606; }
-button.recording:hover:not(:disabled) { background: #ff8585; }
-button:disabled { opacity: 0.45; cursor: not-allowed; }
-/* Added: visible keyboard focus. */
+button:hover:not(:disabled) { background: var(--surface-2); border-color: var(--muted); }
+/* The one filled control: the text colour inverted, not a bright hue. */
+button.primary { background: var(--text); border-color: var(--text); color: var(--bg); }
+button.primary:hover:not(:disabled) { background: var(--muted); border-color: var(--muted); }
+button.recording { background: var(--danger); border-color: var(--danger); color: #fff; }
+button.recording:hover:not(:disabled) { background: #e2817c; border-color: #e2817c; }
+button:disabled { opacity: 0.38; cursor: not-allowed; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button.primary:focus-visible, button.recording:focus-visible { outline-color: var(--text); }
+.buttons.compact button { font-size: 12.5px; padding: 6px 11px; }
 
-/* A small pulsing dot in the status line while recording. */
 .rec-dot {
-  width: 12px; height: 12px; border-radius: 50%;
-  background: var(--danger); display: inline-block; margin-right: 8px;
-  vertical-align: middle; animation: pulse 1s ease-in-out infinite;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--danger); display: inline-block; margin-right: 7px;
+  vertical-align: middle; animation: pulse 1.2s ease-in-out infinite;
 }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-/* Added: text inputs share the reference select styling. */
-input[type="text"] {
-  width: 100%;
-  min-width: 0;
-  background: var(--panel-2);
+/* ---- Form controls ---- */
+input[type="text"], select {
+  width: 100%; min-width: 0;
+  background: var(--surface-2);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 18px;
-  font-family: inherit;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 8px 11px;
+  font-size: 13.5px; font-family: inherit;
 }
-input[type="text"]::placeholder { color: var(--muted); opacity: 1; }
-input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+input[type="text"]::placeholder { color: var(--faint); opacity: 1; }
+input[type="text"]:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+select:disabled { opacity: 0.38; cursor: not-allowed; }
 
-/* Speech recognition model picker (reference select styling). */
-select {
-  width: 100%;
-  background: var(--panel-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  font-size: 18px;
-  font-family: inherit;
-}
-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-select:disabled { opacity: 0.45; cursor: not-allowed; }
-
-/* Added: speaker-detection checkbox row. */
-.check { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+.check { display: flex; align-items: center; gap: 9px; }
 .check input {
-  width: 22px; height: 22px; margin: 0; flex: none;
+  width: 16px; height: 16px; margin: 0; flex: none;
   accent-color: var(--accent); cursor: pointer;
 }
 .check input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.check input:disabled { opacity: 0.45; cursor: not-allowed; }
-.check label {
-  display: inline; margin: 0;
-  font-size: 20px; font-weight: 600; text-transform: none; letter-spacing: 0;
-  color: var(--text); cursor: pointer;
+.check input:disabled { opacity: 0.38; cursor: not-allowed; }
+.check label { margin: 0; font-size: 13.5px; color: var(--text); cursor: pointer; }
+.check input:disabled + label { opacity: 0.38; cursor: not-allowed; }
+
+/* ---- Mic meter: takes up space only while the mic is live ---- */
+.meter-wrap {
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.22s ease;
 }
-.check input:disabled + label { opacity: 0.45; cursor: not-allowed; }
+.controls:has(#micBtn.recording) .meter-wrap { max-height: 80px; opacity: 1; margin-top: 12px; }
+/* Without :has() support the meter simply stays visible, as it was before. */
+@supports not selector(:has(*)) {
+  .meter-wrap { max-height: none; opacity: 1; margin-top: 12px; }
+}
+.meter { border-radius: var(--radius-sm); overflow: hidden; background: var(--bar-bg); }
+canvas { display: block; max-width: 100%; }
+.meter canvas { width: 100%; height: 48px; }
 
-/* Added: explanatory helper text. */
-.helper { color: var(--muted); font-size: 16px; line-height: 1.5; margin: 12px 0 0; }
-.helper.flush { margin: 0 0 12px; }
-
-/* Model info block (monospace readout). */
+/* ---- Model rows: plain lines, divided by hairlines ---- */
+.model-rows { margin-top: 12px; }
 .model-line {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 15px; color: var(--muted);
-  background: var(--panel-2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 10px 14px; line-height: 1.5;
+  font-size: 12.5px; color: var(--faint);
+  padding: 7px 0; line-height: 1.5;
   overflow-wrap: anywhere;
+  transition: color 0.15s ease;
 }
-.model-line + .model-line { margin-top: 8px; }
-/* Added: highlight the model in use; dim diarization while it is switched off. */
-.model-line.active { border-color: var(--accent); color: var(--text); }
-.model-line.off { opacity: 0.5; }
-/* Added: download state after the model details. */
+.model-line + .model-line { border-top: 1px solid var(--border); }
+.model-line.active { color: var(--text); }
+.model-line.off { opacity: 0.45; }
+.model-state { font-weight: 500; }
 .model-state[data-state="queued"], .model-state[data-state="loading"] { color: var(--chosen); }
+.model-state[data-state="ready"] { color: var(--ok); }
 .model-state[data-state="failed"] { color: var(--danger); }
 
-/* Progress bar (family track/fill). */
+/* ---- Status and progress ---- */
+.statusbar { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
 .track {
-  position: relative;
-  background: var(--bar-bg); border-radius: 8px; height: 34px;
-  overflow: hidden; margin-top: 10px;
+  position: relative; overflow: hidden;
+  background: var(--bar-bg); border-radius: 2px; height: 3px;
+  margin-bottom: 10px;
 }
 .fill {
-  height: 100%; width: 0; border-radius: 8px 0 0 8px;
-  background: linear-gradient(90deg, #3a72c9, var(--accent));
+  height: 100%; width: 0;
+  background: var(--accent);
   transition: width 0.35s ease; min-width: 2px;
 }
-/* Added: indeterminate state for steps that report no percentage. */
 .track.indeterminate .fill {
-  width: 35%; border-radius: 8px; transition: none;
+  width: 35%; transition: none;
   animation: indeterminate 1.4s ease-in-out infinite;
 }
 @keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 
-/* Status line */
-.status { min-height: 24px; color: var(--muted); font-size: 17px; margin-top: 16px; overflow-wrap: anywhere; }
-/* Added: focus target when the Retry button disappears; not interactive itself. */
+.status { min-height: 20px; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
 .status:focus { outline: none; }
 .status.error { color: var(--danger); }
 .status.warning { color: var(--chosen); }
-.meta-value { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--chosen); }
+.meta-value { font-variant-numeric: tabular-nums; color: var(--text); }
+#retryRow { margin-top: 10px; }
 
-/* Mic level meter (native canvas). */
-canvas { display: block; max-width: 100%; }
-.meter {
-  margin-top: 16px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  overflow: hidden;
-  background: var(--bar-bg);
+/* ---- Transcript ---- */
+.transcript-panel { display: flex; flex-direction: column; min-height: 420px; }
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  padding-bottom: 12px; border-bottom: 1px solid var(--border);
 }
-.meter canvas { width: 100%; height: 64px; }
+.panel-head .label { margin: 0; }
 
-/* Added: transcript panel. */
-.source-info { margin: 0 0 10px; color: var(--muted); font-size: 17px; overflow-wrap: anywhere; }
-.source-info strong { color: var(--text); font-weight: 600; }
-audio { display: block; width: 100%; }
+.source { margin-top: 14px; }
+.source-info { margin: 0 0 8px; color: var(--faint); font-size: 12.5px; overflow-wrap: anywhere; }
+.source-info strong { color: var(--text); font-weight: 500; }
+audio { display: block; width: 100%; height: 32px; }
 
-.speaker-list { display: flex; flex-direction: column; gap: 10px; }
-.speaker-row { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); gap: 12px; align-items: center; }
-.speaker-row label { margin: 0; display: flex; align-items: center; gap: 10px; }
-.swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--spk, var(--muted)); }
+.speakers { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.speaker-list { display: flex; flex-direction: column; gap: 7px; }
+.speaker-row { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr); gap: 10px; align-items: center; }
+.speaker-row label { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.speaker-row input[type="text"] { max-width: 300px; }
+.swatch { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--spk, var(--muted)); }
 
 [data-color="0"] { --spk: var(--accent); }
 [data-color="1"] { --spk: var(--chosen); }
@@ -214,51 +246,58 @@ audio { display: block; width: 100%; }
 [data-color="5"] { --spk: var(--speaker-6); }
 
 .empty {
-  margin: 18px 0 0; padding: 18px;
-  color: var(--muted); font-size: 17px;
-  background: var(--panel-2); border: 1px dashed var(--border); border-radius: 10px;
+  flex: 1 1 auto;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; margin: 0; padding: 40px 20px;
+  color: var(--faint); font-size: 13px;
 }
-.turns { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.turn {
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--spk, var(--border));
-  border-radius: 10px;
-  padding: 12px 16px;
+
+/* Turns are rows in a list, not a stack of cards. */
+.turns {
+  list-style: none; margin: 0; padding: 0;
+  /* Long recordings run to hundreds of turns, so the head stays reachable. */
+  max-height: min(70vh, 780px); overflow-y: auto;
+  scrollbar-width: thin;
 }
-.turn-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 15px; }
-.turn-speaker { font-weight: 700; color: var(--spk, var(--text)); overflow-wrap: anywhere; }
-.turn-speaker.unknown { color: var(--muted); font-style: italic; font-weight: 600; }
+.turn { padding: 11px 0; }
+.turn + .turn { border-top: 1px solid var(--border); }
+.turn-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 9px; font-size: 11.5px; }
+.turn-speaker { font-weight: 600; color: var(--spk, var(--text)); overflow-wrap: anywhere; }
+.turn-speaker.unknown { color: var(--faint); font-style: italic; font-weight: 500; }
 .turn-time {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  color: var(--muted); font-variant-numeric: tabular-nums;
+  color: var(--faint); font-variant-numeric: tabular-nums; font-size: 11px;
 }
-.turn-text { margin: 4px 0 0; overflow-wrap: anywhere; }
+.turn-text { margin: 2px 0 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
 
-/* Footer */
-.footnote { margin-top: 30px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+/* ---- Credits ---- */
+.credits { margin-top: 18px; }
+.credits summary {
+  cursor: pointer; width: fit-content;
+  font-size: 12px; color: var(--faint); padding: 4px 2px;
+}
+.credits summary:hover { color: var(--text); }
+.credits summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.footnote { margin: 6px 0 0; color: var(--faint); font-size: 11.5px; line-height: 1.65; max-width: 90ch; }
 .footnote a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
-.footnote a:hover { color: var(--accent); }
-.repo-link { margin-top: 14px; }
+.footnote a:hover { color: var(--text); }
 
-/* Added: phone layout. */
+/* ---- Narrow screens ---- */
 @media (max-width: 600px) {
-  body { font-size: 18px; }
-  .wrap { padding: 20px 16px 48px; }
-  h1 { font-size: 30px; }
-  .subtitle { font-size: 17px; margin-bottom: 20px; }
-  .panel { padding: 16px; }
-  .buttons { gap: 10px; }
+  .app { padding: 22px 16px 36px; }
+  .layout { gap: 12px; }
+  .panel { padding: 14px; }
   .buttons button { flex: 1 1 auto; }
-  button { font-size: 18px; padding: 12px 16px; }
-  /* 16px keeps iOS from zooming in when the select gets focus. */
-  select { font-size: 16px; padding: 10px 12px; }
-  .check label { font-size: 18px; }
-  .speaker-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  /* 16px keeps iOS from zooming in when a field gets focus. */
+  input[type="text"], select { font-size: 16px; }
+  .speaker-row { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+  .speaker-row input[type="text"] { max-width: none; }
+  .transcript-panel { min-height: 280px; }
+  .turns { max-height: none; overflow-y: visible; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
   .rec-dot { animation: none; }
-  .fill { transition: none; }
   .track.indeterminate .fill { animation: none; width: 100%; opacity: 0.5; }
 }
